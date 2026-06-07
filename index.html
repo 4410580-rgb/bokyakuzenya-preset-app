@@ -153,13 +153,14 @@
     border: none;
     border-bottom: 1px solid transparent;
     color: var(--accent);
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 16px;
+    font-family: 'Noto Serif JP', serif;
+    font-size: 14px;
     font-weight: 600;
     width: 100%;
     outline: none;
     transition: border-color 0.2s;
-    padding: 2px 0;
+    padding: 0;
+    line-height: 1;
   }
   .deck-name-input:focus { border-bottom-color: var(--accent); }
   .deck-name-input::placeholder { color: var(--text-dim); opacity: 0.5; }
@@ -655,23 +656,27 @@ function previewSlotHTML(name) {
 
 // ── 保存 ──────────────────────────────────────────────
 function saveDeck() {
-  if (!parsedData) return;
   const slots = loadSlots();
   const memo = document.getElementById('memoArea').value.trim();
 
   if (targetSlotIndex !== null) {
-    // 上書きモード：指定スロットに保存、ラベルはそのまま
-    slots[targetSlotIndex].data = {
-      units: parsedData.units,
-      cards: parsedData.cards,
-      code: parsedData.code,
-      uid: parsedData.uid,
-      raw: parsedData.raw,
-      memo,
-      savedAt: new Date().toLocaleDateString('ja-JP')
-    };
+    if (parsedData) {
+      // 新しいテキストがパースされている → フル上書き
+      slots[targetSlotIndex].data = {
+        units: parsedData.units,
+        cards: parsedData.cards,
+        code: parsedData.code,
+        uid: parsedData.uid,
+        raw: parsedData.raw,
+        memo,
+        savedAt: new Date().toLocaleDateString('ja-JP')
+      };
+    } else if (slots[targetSlotIndex].data) {
+      // パースなし・既存データあり → メモのみ更新
+      slots[targetSlotIndex].data.memo = memo;
+    }
   } else {
-    // 追加モード：最初の空スロットに入れる
+    if (!parsedData) return;
     const emptyIdx = slots.findIndex(s => !s.data);
     if (emptyIdx < 0) { alert('スロットが全て埋まっています'); return; }
     slots[emptyIdx].data = {
@@ -829,16 +834,34 @@ function openSlotModal(index) {
   const slots = loadSlots();
   const label = slots[index].label;
   const hasData = !!slots[index].data;
+
   document.getElementById('modalTitle').textContent =
-    (hasData ? '編成を上書き — ' : '編成を入力 — ') + label;
-  // 編成がある時だけ消去ボタンを表示
+    hasData ? 'メモを編集 — ' + label : '編成を入力 — ' + label;
   document.getElementById('clearBtn').style.display = hasData ? 'flex' : 'none';
-  resetModal();
+
+  // 既存編成がある場合：ペーストエリアを隠してメモだけ表示
+  const pasteArea = document.getElementById('pasteArea');
+  const pasteHintDiv = pasteArea;
+  if (hasData) {
+    pasteArea.style.display = 'none';
+    document.getElementById('preview').classList.remove('visible');
+    // 既存メモを読み込む
+    document.getElementById('memoArea').value = slots[index].data.memo || '';
+    document.getElementById('saveBtn').disabled = false;
+  } else {
+    pasteArea.style.display = 'block';
+    document.getElementById('memoArea').value = '';
+    document.getElementById('saveBtn').disabled = true;
+  }
+
+  document.getElementById('parseError').textContent = '';
+  parsedData = null;
   document.getElementById('modal').classList.add('open');
 }
 
 function resetModal() {
   document.getElementById('pasteArea').value = '';
+  document.getElementById('pasteArea').style.display = 'block';
   document.getElementById('memoArea').value = '';
   document.getElementById('preview').classList.remove('visible');
   document.getElementById('parseError').textContent = '';
