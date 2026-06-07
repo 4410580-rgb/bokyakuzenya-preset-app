@@ -1,1 +1,926 @@
-a
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>忘却前夜 — 編成アーカイブ</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Noto+Serif+JP:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #12121a;
+    --surface2: #1a1a26;
+    --border:   #2a2a3f;
+    --accent:   #7eb8c9;
+    --accent2:  #c9a87e;
+    --text:     #d4d4e0;
+    --text-dim: #7a7a9a;
+    --danger:   #c97e7e;
+    --glow:     rgba(126,184,201,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif JP', serif;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(126,184,201,0.06) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(42,42,63,0.15) 60px, rgba(42,42,63,0.15) 61px),
+      repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(42,42,63,0.15) 60px, rgba(42,42,63,0.15) 61px);
+  }
+
+  /* ── ヘッダー ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(12px);
+    background: rgba(10,10,15,0.85);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text-dim); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  @media (max-width: 480px) {
+    .logo { font-size: 16px; }
+    .logo span { font-size: 10px; margin-left: 6px; }
+    header { padding: 0 12px; }
+  }
+
+  /* ── ボタン ── */
+  .btn {
+    border: none; cursor: pointer; font-family: 'Noto Serif JP', serif;
+    transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent) 0%, #5a9baf 100%);
+    color: #0a0a0f;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+  .btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── メインレイアウト ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 16px; }
+  .page-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  /* ── 編成グリッド ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  /* ── 編成カード ── */
+  .deck-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px;
+    position: relative;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+  .deck-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .deck-card:hover { border-color: rgba(126,184,201,0.4); box-shadow: 0 0 20px var(--glow); }
+  .deck-card:hover::before { opacity: 1; }
+
+  /* 空スロット：クリックで編成入力 */
+  .deck-card.empty {
+    border-style: dashed;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.2s, border-color 0.2s;
+  }
+  .deck-card.empty:hover { opacity: 1; border-color: var(--accent); border-style: solid; }
+
+  /* ── カードヘッダー ── */
+  .deck-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .deck-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 24px;
+    flex-shrink: 0;
+  }
+
+  /* チーム名インライン編集 */
+  .deck-name-wrap { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .deck-name-input {
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid transparent;
+    color: var(--accent);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 600;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+    padding: 2px 0;
+  }
+  .deck-name-input:focus { border-bottom-color: var(--accent); }
+  .deck-name-input::placeholder { color: var(--text-dim); opacity: 0.5; }
+
+  .deck-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .icon-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── スロット行 ── */
+  .slots-row { display: flex; gap: 4px; margin-bottom: 6px; }
+  .slot {
+    flex: 1;
+    aspect-ratio: 3/4;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+  }
+  .slot img {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: top center;
+  }
+  .slot-placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: var(--border);
+  }
+
+  /* 空カードのタップ誘導 */
+  .empty-slots-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+    gap: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .empty-slots-hint .plus { font-size: 24px; color: var(--border); }
+
+  /* ── トースト ── */
+  .copy-toast {
+    position: fixed;
+    bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 9px 22px;
+    font-size: 13px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    z-index: 999;
+  }
+  .copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── モーダル共通 ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.78);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.22s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: 540px; max-width: 96vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 28px;
+    position: relative;
+    transform: translateY(14px);
+    transition: transform 0.22s;
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-close {
+    position: absolute; top: 18px; right: 18px;
+    background: transparent; border: none;
+    color: var(--text-dim); font-size: 18px; cursor: pointer;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  label { display: block; font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em; margin-bottom: 6px; }
+  textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Noto Serif JP', serif;
+    font-size: 12px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 140px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+
+  .parse-preview {
+    margin-top: 14px; padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    display: none;
+  }
+  .parse-preview.visible { display: block; }
+  .preview-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .preview-tag {
+    font-size: 11px; padding: 3px 8px;
+    background: rgba(126,184,201,0.1);
+    border: 1px solid rgba(126,184,201,0.2);
+    color: var(--accent);
+  }
+  .preview-tag.card-tag {
+    background: rgba(201,168,126,0.1);
+    border-color: rgba(201,168,126,0.2);
+    color: var(--accent2);
+  }
+  .parse-error { color: var(--danger); font-size: 12px; margin-top: 8px; }
+  .modal-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 20px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">忘却前夜<span>編成アーカイブ</span></div>
+  <button class="btn btn-primary" onclick="openAddModal()">＋ 編成を追加</button>
+</header>
+
+<main>
+  <div class="page-title">Preset Archive — 100 Slots</div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div class="copy-toast" id="toast">テキストをコピーしました</div>
+
+<!-- 編成入力モーダル（追加 & 上書き共用） -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">編成を追加</div>
+    <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <label>共有テキストをペースト</label>
+    <textarea id="pasteArea" placeholder="「対人戦——編成共有&#10;守秘者：...」のテキストをここにペーストしてください" oninput="parseInput()"></textarea>
+
+    <div class="parse-preview" id="preview">
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">■ パース結果</div>
+      <div style="font-size:12px;color:var(--accent2);margin-bottom:8px;" id="previewName"></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">キャラクター</div>
+      <div class="preview-row" id="previewUnits"></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;margin-top:8px;">運命の札・鍵</div>
+      <div class="preview-row" id="previewCards"></div>
+    </div>
+    <div class="parse-error" id="parseError"></div>
+
+    <div style="margin-top:14px;">
+      <label>メモ（任意）</label>
+      <textarea id="memoArea" placeholder="使い方・補足など" style="min-height:55px;"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-danger" id="clearBtn" onclick="clearFromModal()" style="display:none;margin-right:auto;border-color:var(--danger);color:var(--danger);">編成を消去</button>
+      <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveDeck()" disabled>保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 画像マッピング ─────────────────────────────────────
+const IMAGE_BASE = './images/';
+const unitMap = {
+  'アルバ':       'アルバ.png',
+  'リリー':       'リリー.png',
+  'アイギス':     'アイギス.png',
+  'エリカ':       'エリカ.png',
+  'ウインクル':   'ウインクル.png',
+  'オジール':     'オジール.png',
+  'サンガー':     'サンガー.png',
+  'ワンダ':       'ワンダ.png',
+  'ファイント':   'ファイント.png',
+  'アグリッパ':   'アグリッパ.png',
+  'ロータン':     'ロータン.png',
+  '「24」':       '「24」.png',
+  'ミリアム':     'ミリアム.png',
+  '環行・ラモンナ': '環行・ラモンナ.png',
+  'マーフィー':   'マーフィー.png',
+  'パンディア':   'パンディア.png',
+  'ナウティラ':   'ナウティラ.png',
+  'ソレール':     'ソレール.png',
+  'ジェンキン':   'ジェンキン.png',
+  'リッツ':       'リッツ.png',
+  'オレッタ':     'オレッタ.png',
+  'ユウハシュ':   'ユウハシュ.png',
+  'ニムフィーア': 'ニムフィーア.png',
+  'トゥルー':     'トゥルー.png',
+  'ハムリン':     'ハムリン.png',
+  'カエクス':     'カエクス.png',
+  'ライカー':     'ライカー.png',
+  'ゴリアテ':     'ゴリアテ.png',
+  'サルバドル':   'サルバドル.png',
+  '血ノ鎖・ヘロット': '血ノ鎖・ヘロット.png',
+  'ヘロット':     'ヘロット.png',
+  'ダフォダイル': 'ダフォダイル.png',
+  'ティンクト':   'ティンクト.png',
+  'ファロス':     'ファロス.png',
+  'ラモンナ':     'ラモンナ.png',
+  'カーシア':     'カーシア.png',
+  'タイス':       'タイス.png',
+  'ドール':       'ドール.png',
+  'レーア':       'レーア.png',
+  'シレスト':     'シレスト.png',
+  '沙耶':         '沙耶.png',
+  'オルラ':       'オルラ.png',
+  'カレン':       'カレン.png',
+};
+const cardMap = {
+  // キーオーダー (24)
+  '頭の中の音':       '頭の中の音.png',
+  '小さな願い':       '小さな願い.png',
+  '鼠の知恵':         '鼠の知恵.png',
+  '純白の出会い':     '純白の出会い.png',
+  '注射の加護':       '注射の加護.png',
+  '永遠の執念':       '永遠の執念.png',
+  '不朽の葬儀':       '不朽の葬儀.png',
+  '唯一の種子':       '唯一の種子.png',
+  '不平等な交換':     '不平等な交換.png',
+  '最後の誓い':       '最後の誓い.png',
+  'オレッタの宝物':   'オレッタの宝物.png',
+  '咆哮する血と砂':   '咆哮する血と砂.png',
+  '傍き永遠':         '傍き永遠.png',
+  '腐敗の饗宴':       '腐敗の饗宴.png',
+  '骨を蝕む抱擁':     '骨を蝕む抱擁.png',
+  '湖畔の回想':       '湖畔の回想.png',
+  '回帰の扉を越え':   '回帰の扉を越え.png',
+  '灰霧の正体':       '灰霧の正体.png',
+  '真夏の夢':         '真夏の夢.png',
+  '薔薇の勝利':       '薔薇の勝利.png',
+  '神の御業':         '神の御業.png',
+  '巨人の覇道':       '巨人の覇道.png',
+  'すべてが彼女':     'すべてが彼女.png',
+  '海の祭':           '海の祭.png',
+  // 運命の札 (101)
+  '35mmの魔法':           '35mmの魔法.png',
+  'アクートの春':         'アクートの春.png',
+  'イサラウの眼差し':     'イサラウの眼差し.png',
+  'カウントダウン':       'カウントダウン.png',
+  'ギャンブルの知恵':     'ギャンブルの知恵.png',
+  'パートナーの特訓':     'パートナーの特訓.png',
+  'マジックショー':       'マジックショー.png',
+  '不屈の意志':           '不屈の意志.png',
+  '信仰の力':             '信仰の力.png',
+  '入学の日':             '入学の日.png',
+  '冬の夜の追憶':         '冬の夜の追憶.png',
+  '切断と危害':           '切断と危害.png',
+  '吃き':                 '吃き.png',
+  '吸う':                 '吸う.png',
+  '回れ回れ':             '回れ回れ.png',
+  '夜に伏す':             '夜に伏す.png',
+  '夢遊の異界':           '夢遊の異界.png',
+  '奇体の反噬':           '奇体の反噬.png',
+  '女王の戒律':           '女王の戒律.png',
+  '存在しない場所':       '存在しない場所.png',
+  '寵愛':                 '寵愛.png',
+  '導きの帆':             '導きの帆.png',
+  '巨人の刃':             '巨人の刃.png',
+  '希望':                 '希望.png',
+  '幸運の時':             '幸運の時.png',
+  '庇護':                 '庇護.png',
+  '強欲':                 '強欲.png',
+  '心の障壁':             '心の障壁.png',
+  '忘却の手':             '忘却の手.png',
+  '悟り':                 '悟り.png',
+  '情報は命':             '情報は命.png',
+  '慈悲の育み':           '慈悲の育み.png',
+  '懲罰':                 '懲罰.png',
+  '捕食者の子守唄':       '捕食者の子守唄.png',
+  '旅の荷物':             '旅の荷物.png',
+  '昔日の花と詩':         '昔日の花と詩.png',
+  '星天の獣':             '星天の獣.png',
+  '時を遡る時計':         '時を遡る時計.png',
+  '暴風雨の中で':         '暴風雨の中で.png',
+  '暴食':                 '暴食.png',
+  '暴食寓話':             '暴食寓話.png',
+  '核溶解':               '核溶解.png',
+  '桜花の幻想':           '桜花の幻想.png',
+  '極夜と暁':             '極夜と暁.png',
+  '欲望の海':             '欲望の海.png',
+  '死の分析':             '死の分析.png',
+  '死を超える':           '死を超える.png',
+  '氷河の眠り':           '氷河の眠り.png',
+  '永劫の演奏':           '永劫の演奏.png',
+  '永遠の鎮魂歌':         '永遠の鎮魂歌.png',
+  '汚泥の中の童話':       '汚泥の中の童話.png',
+  '洞察':                 '洞察.png',
+  '活性':                 '活性.png',
+  '海の夢':               '海の夢.png',
+  '深海の呼び声':         '深海の呼び声.png',
+  '深紅に沈む':           '深紅に沈む.png',
+  '湧出':                 '湧出.png',
+  '無声の宴':             '無声の宴.png',
+  '熟成':                 '熟成.png',
+  '熱い別れのキス':       '熱い別れのキス.png',
+  '狂乱':                 '狂乱.png',
+  '狂魔の宴':             '狂魔の宴.png',
+  '珊瑚の女の死':         '珊瑚の女の死.png',
+  '疼痛の鰭':             '疼痛の鰭.png',
+  '痛みを越えて':         '痛みを越えて.png',
+  '百万の寵愛の眼':       '百万の寵愛の眼.png',
+  '神王の讃歌':           '神王の讃歌.png',
+  '神言の石板':           '神言の石板.png',
+  '私的な休息':           '私的な休息.png',
+  '秘められた誕生':       '秘められた誕生.png',
+  '箱の中の童心':         '箱の中の童心.png',
+  '精神集中':             '精神集中.png',
+  '縛られた歌':           '縛られた歌.png',
+  '職責':                 '職責.png',
+  '腐朽の贈り物':         '腐朽の贈り物.png',
+  '臨界点':               '臨界点.png',
+  '至高の秘蔵品':         '至高の秘蔵品.png',
+  '花香る世界を願って':   '花香る世界を願って.png',
+  '苦しみの呪縛':         '苦しみの呪縛.png',
+  '落日':                 '落日.png',
+  '蒼白の末裔':           '蒼白の末裔.png',
+  '薔薇の名において':     '薔薇の名において.png',
+  '親友へ':               '親友へ.png',
+  '計算不能な演算':       '計算不能な演算.png',
+  '記憶螺旋':             '記憶螺旋.png',
+  '記憶障害':             '記憶障害.png',
+  '詩の結び':             '詩の結び.png',
+  '貴族の杖':             '貴族の杖.png',
+  '迷いの道':             '迷いの道.png',
+  '追放':                 '追放.png',
+  '運命のルーレット':     '運命のルーレット.png',
+  '銀ダラの決意':         '銀ダラの決意.png',
+  '錯乱':                 '錯乱.png',
+  '鎖を断ち切る日':       '鎖を断ち切る日.png',
+  '鏡の中の人':           '鏡の中の人.png',
+  '集会の時':             '集会の時.png',
+  '雪山が溶けるまで':     '雪山が溶けるまで.png',
+  '青石の玉座':           '青石の玉座.png',
+  '騎士の心':             '騎士の心.png',
+  '魂の誕生':             '魂の誕生.png',
+  '魔女のつば広帽子':     '魔女のつば広帽子.png',
+};
+function getUnitImg(name) { const f=unitMap[name]; return f?IMAGE_BASE+'units/'+f:null; }
+function getCardImg(name) { const f=cardMap[name]; return f?IMAGE_BASE+'cards/'+f:null; }
+
+// ── ストレージ ────────────────────────────────────────
+const STORAGE_KEY = 'amnesia_decks_v2';
+const MAX_SLOTS = 100;
+
+function loadSlots() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (Array.isArray(saved) && saved.length === MAX_SLOTS) return saved;
+  } catch {}
+  // 初期化：50スロット全部空
+  return Array.from({length: MAX_SLOTS}, (_, i) => ({
+    index: i,
+    label: 'チーム' + (i + 1),  // デフォルト名
+    data: null  // null = 空
+  }));
+}
+
+function saveSlots(slots) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(slots));
+}
+
+// ── パーサー ──────────────────────────────────────────
+function parseShareText(raw) {
+  const text = raw.replace(/^「|」$/g, '').trim();
+  const nameMatch = text.match(/チーム名：(.+)/);
+  if (!nameMatch) throw new Error('チーム名が見つかりません');
+  const teamName = nameMatch[1].trim();
+  const codeMatch = text.match(/@@([^@]+)@@/);
+  const code = codeMatch ? codeMatch[1] : '';
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const nameIdx = lines.findIndex(l => l.startsWith('チーム名：'));
+  if (nameIdx < 0) throw new Error('フォーマットエラー');
+  const dataLines = lines.slice(nameIdx + 1).filter(l =>
+    l.includes('、') && !l.startsWith('守') && !l.startsWith('対') && !l.startsWith('@@')
+  );
+  if (dataLines.length < 2) throw new Error('キャラ・カード行が見つかりません');
+  const units = dataLines[0].split('、').map(s => s.trim()).filter(Boolean);
+  const cards = dataLines[1].split('、').map(s => s.trim()).filter(Boolean);
+  const ownerMatch = text.match(/守秘者：[^（\n]*（(\d+)）/);
+  const uid = ownerMatch ? ownerMatch[1] : '';
+  return { teamName, units, cards, code, uid, raw: raw.trim() };
+}
+
+// ── パース → プレビュー ───────────────────────────────
+let parsedData = null;
+let targetSlotIndex = null; // どのスロットに保存するか
+
+function parseInput() {
+  const raw = document.getElementById('pasteArea').value;
+  const preview = document.getElementById('preview');
+  const errEl = document.getElementById('parseError');
+  const saveBtn = document.getElementById('saveBtn');
+  errEl.textContent = '';
+  preview.classList.remove('visible');
+  parsedData = null;
+  saveBtn.disabled = true;
+  if (!raw.trim()) return;
+  try {
+    parsedData = parseShareText(raw);
+    document.getElementById('previewName').textContent = '📋 ' + parsedData.teamName;
+    document.getElementById('previewUnits').innerHTML =
+      parsedData.units.map(n => `<span class="preview-tag">${n}</span>`).join('');
+    document.getElementById('previewCards').innerHTML =
+      parsedData.cards.map(n => `<span class="preview-tag card-tag">${n}</span>`).join('');
+    preview.classList.add('visible');
+    saveBtn.disabled = false;
+  } catch(e) {
+    errEl.textContent = '⚠ ' + e.message;
+  }
+}
+
+// ── 保存 ──────────────────────────────────────────────
+function saveDeck() {
+  if (!parsedData) return;
+  const slots = loadSlots();
+  const memo = document.getElementById('memoArea').value.trim();
+
+  if (targetSlotIndex !== null) {
+    // 上書きモード：指定スロットに保存、ラベルはそのまま
+    slots[targetSlotIndex].data = {
+      units: parsedData.units,
+      cards: parsedData.cards,
+      code: parsedData.code,
+      uid: parsedData.uid,
+      raw: parsedData.raw,
+      memo,
+      savedAt: new Date().toLocaleDateString('ja-JP')
+    };
+  } else {
+    // 追加モード：最初の空スロットに入れる
+    const emptyIdx = slots.findIndex(s => !s.data);
+    if (emptyIdx < 0) { alert('スロットが全て埋まっています'); return; }
+    slots[emptyIdx].data = {
+      units: parsedData.units,
+      cards: parsedData.cards,
+      code: parsedData.code,
+      uid: parsedData.uid,
+      raw: parsedData.raw,
+      memo,
+      savedAt: new Date().toLocaleDateString('ja-JP')
+    };
+  }
+  saveSlots(slots);
+  closeModal();
+  render();
+}
+
+// ── ラベル保存 ────────────────────────────────────────
+function saveLabel(index, value) {
+  const slots = loadSlots();
+  slots[index].label = value || ('チーム' + (index + 1));
+  saveSlots(slots);
+}
+
+// ── 削除 ──────────────────────────────────────────────
+function clearSlot(index, e) {
+  e.stopPropagation();
+  if (!confirm('この編成をクリアしますか？')) return;
+  const slots = loadSlots();
+  slots[index].data = null;
+  saveSlots(slots);
+  render();
+}
+
+// ── コピー ────────────────────────────────────────────
+function copyRaw(raw, e) {
+  if (e) e.stopPropagation();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(raw).then(() => showToast()).catch(() => fallbackCopy(raw));
+  } else {
+    fallbackCopy(raw);
+  }
+}
+function fallbackCopy(raw) {
+  const ta = document.createElement('textarea');
+  ta.value = raw;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try { document.execCommand('copy'); showToast(); } catch {}
+  document.body.removeChild(ta);
+}
+function showToast() {
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── スロットHTML ──────────────────────────────────────
+function slotHTML(name, type) {
+  const imgSrc = type === 'unit' ? getUnitImg(name) : getCardImg(name);
+  return `<div class="slot ${type}">
+    ${imgSrc
+      ? `<img src="${imgSrc}" alt="${name}" loading="lazy">`
+      : `<div class="slot-placeholder">✦</div>`}
+  </div>`;
+}
+
+// ── レンダリング ──────────────────────────────────────
+function render() {
+  const slots = loadSlots();
+  const grid = document.getElementById('grid');
+
+  grid.innerHTML = slots.map((slot, i) => {
+    const num = String(i + 1).padStart(2, '0');
+
+    if (!slot.data) {
+      // 空スロット
+      return `
+        <div class="deck-card empty" onclick="openSlotModal(${i})">
+          <div class="deck-header">
+            <span class="deck-number">${num}</span>
+            <div class="deck-name-wrap">
+              <input class="deck-name-input" value="${escHtml(slot.label)}"
+                placeholder="チーム名"
+                onclick="event.stopPropagation()"
+                onchange="saveLabel(${i}, this.value)"
+              >
+            </div>
+          </div>
+          <div class="empty-slots-hint">
+            <span class="plus">＋</span>
+            <span>タップして編成を入力</span>
+          </div>
+        </div>`;
+    }
+
+    const d = slot.data;
+    return `
+      <div class="deck-card" onclick="openSlotModal(${i})">
+        <div class="deck-header">
+          <span class="deck-number">${num}</span>
+          <div class="deck-name-wrap">
+            <input class="deck-name-input" value="${escHtml(slot.label)}"
+              placeholder="チーム名"
+              onclick="event.stopPropagation()"
+              onchange="saveLabel(${i}, this.value)"
+            >
+          </div>
+          <div class="deck-actions">
+            <button class="icon-btn" title="コピー" onclick='copyRaw(${JSON.stringify(d.raw)}, event)'>⎘</button>
+          </div>
+        </div>
+        <div class="slots-row">
+          ${d.units.map(n => slotHTML(n, 'unit')).join('')}
+        </div>
+        <div class="slots-row">
+          ${d.cards.map(n => slotHTML(n, 'card')).join('')}
+        </div>
+        ${d.memo ? `<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">${escHtml(d.memo)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── モーダル ──────────────────────────────────────────
+function openAddModal() {
+  const slots = loadSlots();
+  const emptyIdx = slots.findIndex(s => !s.data);
+  if (emptyIdx < 0) { alert('スロットが全て埋まっています（100/100）'); return; }
+  targetSlotIndex = null;
+  document.getElementById('modalTitle').textContent = '編成を追加';
+  document.getElementById('clearBtn').style.display = 'none';
+  resetModal();
+  document.getElementById('modal').classList.add('open');
+}
+
+function clearFromModal() {
+  if (!confirm('この編成を消去しますか？')) return;
+  const slots = loadSlots();
+  slots[targetSlotIndex].data = null;
+  saveSlots(slots);
+  closeModal();
+  render();
+}
+
+function openSlotModal(index) {
+  targetSlotIndex = index;
+  const slots = loadSlots();
+  const label = slots[index].label;
+  const hasData = !!slots[index].data;
+  document.getElementById('modalTitle').textContent =
+    (hasData ? '編成を上書き — ' : '編成を入力 — ') + label;
+  // 編成がある時だけ消去ボタンを表示
+  document.getElementById('clearBtn').style.display = hasData ? 'flex' : 'none';
+  resetModal();
+  document.getElementById('modal').classList.add('open');
+}
+
+function resetModal() {
+  document.getElementById('pasteArea').value = '';
+  document.getElementById('memoArea').value = '';
+  document.getElementById('preview').classList.remove('visible');
+  document.getElementById('parseError').textContent = '';
+  document.getElementById('saveBtn').disabled = true;
+  parsedData = null;
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+// ── 画像テスト用データ ────────────────────────────────
+const ALL_KEYS = [
+  '頭の中の音','小さな願い','鼠の知恵','純白の出会い','注射の加護',
+  '永遠の執念','不朽の葬儀','唯一の種子','不平等な交換','最後の誓い',
+  'オレッタの宝物','咆哮する血と砂','傍き永遠','腐敗の饗宴','骨を蝕む抱擁',
+  '湖畔の回想','回帰の扉を越え','灰霧の正体','真夏の夢','薔薇の勝利',
+  '神の御業','巨人の覇道','すべてが彼女','海の祭'
+];
+const ALL_UNITS = [
+  'アルバ','リリー','アイギス','エリカ','ウインクル','オジール','サンガー',
+  'ワンダ','ファイント','アグリッパ','ロータン','「24」','ミリアム',
+  '環行・ラモンナ','マーフィー','パンディア','ナウティラ','ソレール',
+  'ジェンキン','リッツ','オレッタ','ユウハシュ','ニムフィーア','トゥルー',
+  'ハムリン','カエクス','ライカー','ゴリアテ','サルバドル','血ノ鎖・ヘロット',
+  'ヘロット','ダフォダイル','ティンクト','ファロス','ラモンナ','カーシア',
+  'タイス','ドール','レーア','シレスト','沙耶','オルラ','カレン'
+];
+const ALL_CARDS = [
+  '35mmの魔法','アクートの春','イサラウの眼差し','カウントダウン','ギャンブルの知恵',
+  'パートナーの特訓','マジックショー','不屈の意志','信仰の力','入学の日',
+  '冬の夜の追憶','切断と危害','吃き','吸う','回れ回れ','夜に伏す','夢遊の異界',
+  '奇体の反噬','女王の戒律','存在しない場所','寵愛','導きの帆','巨人の刃',
+  '希望','幸運の時','庇護','強欲','心の障壁','忘却の手','悟り','情報は命',
+  '慈悲の育み','懲罰','捕食者の子守唄','旅の荷物','昔日の花と詩','星天の獣',
+  '時を遡る時計','暴風雨の中で','暴食','暴食寓話','核溶解','桜花の幻想',
+  '極夜と暁','欲望の海','死の分析','死を超える','氷河の眠り','永劫の演奏',
+  '永遠の鎮魂歌','汚泥の中の童話','洞察','活性','海の夢','深海の呼び声',
+  '深紅に沈む','湧出','無声の宴','熟成','熱い別れのキス','狂乱','狂魔の宴',
+  '珊瑚の女の死','疼痛の鰭','痛みを越えて','百万の寵愛の眼','神王の讃歌',
+  '神言の石板','私的な休息','秘められた誕生','箱の中の童心','精神集中',
+  '縛られた歌','職責','腐朽の贈り物','臨界点','至高の秘蔵品','花香る世界を願って',
+  '苦しみの呪縛','落日','蒼白の末裔','薔薇の名において','親友へ',
+  '計算不能な演算','記憶螺旋','記憶障害','詩の結び','貴族の杖','迷いの道',
+  '追放','運命のルーレット','銀ダラの決意','錯乱','鎖を断ち切る日',
+  '鏡の中の人','集会の時','雪山が溶けるまで','青石の玉座','騎士の心',
+  '魂の誕生','魔女のつば広帽子'
+];
+
+function openTestModal() {
+  document.getElementById('testModal').classList.add('open');
+  renderTestGrid('unit');
+}
+function closeTestModal() {
+  document.getElementById('testModal').classList.remove('open');
+}
+
+function renderTestGrid(type) {
+  // タブ表示切替
+  ['unit','card','key'].forEach(t => {
+    document.getElementById('tab-'+t).style.borderColor = t===type ? 'var(--accent)' : 'var(--border)';
+    document.getElementById('tab-'+t).style.color = t===type ? 'var(--accent)' : 'var(--text-dim)';
+  });
+
+  const list = type==='unit' ? ALL_UNITS : type==='card' ? ALL_CARDS : ALL_KEYS;
+  const grid = document.getElementById('testGrid');
+
+  grid.innerHTML = list.map(name => {
+    const imgSrc = type==='unit' ? getUnitImg(name) : getCardImg(name);
+    const ok = imgSrc !== null;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div style="width:60px;height:80px;background:var(--surface2);border:1px solid ${ok?'var(--accent)':'var(--danger)'};position:relative;overflow:hidden;">
+        ${ok
+          ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;" onerror="this.parentNode.style.borderColor='var(--danger)';this.style.display='none'">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--danger);">✕</div>`
+        }
+      </div>
+      <div style="font-size:9px;color:${ok?'var(--text-dim)':'var(--danger)'};text-align:center;max-width:64px;line-height:1.2;">${name}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 起動 ──────────────────────────────────────────────
+render();
+</script>
+
+<!-- テスト用ボタン（ページ末尾） -->
+<div style="max-width:1200px;margin:0 auto;padding:16px 16px 40px;display:flex;justify-content:flex-end;">
+  <button onclick="openTestModal()" style="
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:'Noto Serif JP',serif;
+    font-size:10px;
+    padding:6px 10px;
+    cursor:pointer;
+    opacity:0.5;
+  ">テスト用 一覧表示</button>
+</div>
+
+<!-- テストモーダル -->
+<div class="modal-overlay" id="testModal">
+  <div class="modal" style="width:680px;">
+    <div class="modal-title">画像テスト一覧</div>
+    <button class="modal-close" onclick="closeTestModal()">✕</button>
+
+    <!-- タブ -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="tab-unit" onclick="renderTestGrid('unit')" style="background:transparent;border:1px solid var(--accent);color:var(--accent);padding:6px 14px;font-size:12px;cursor:pointer;font-family:'Noto Serif JP',serif;">キャラ (43)</button>
+      <button id="tab-card" onclick="renderTestGrid('card')" style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:6px 14px;font-size:12px;cursor:pointer;font-family:'Noto Serif JP',serif;">運命の札 (101)</button>
+      <button id="tab-key"  onclick="renderTestGrid('key')"  style="background:transparent;border:1px solid var(--border);color:var(--text-dim);padding:6px 14px;font-size:12px;cursor:pointer;font-family:'Noto Serif JP',serif;">キーオーダー (24)</button>
+    </div>
+
+    <div id="testGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:10px;max-height:60vh;overflow-y:auto;"></div>
+
+    <div style="margin-top:12px;font-size:10px;color:var(--text-dim);">
+      ■青枠：画像登録済み　■赤枠：未登録または読み込みエラー
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
