@@ -333,23 +333,36 @@
 <!-- 編成入力モーダル（追加 & 上書き共用） -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
-    <div class="modal-title" id="modalTitle">編成を追加</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;" id="modalTitle"></div>
     <button class="modal-close" onclick="closeModal()">✕</button>
 
-    <label>共有テキストをペースト</label>
-    <textarea id="pasteArea" placeholder="「対人戦——編成共有&#10;守秘者：...」のテキストをここにペーストしてください" oninput="parseInput()"></textarea>
+    <!-- 隠しtextarea（長押しペースト用） -->
+    <textarea id="pasteArea" oninput="parseInput()" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;"></textarea>
+
+    <!-- ペースト待機 / パース結果 -->
+    <div id="pasteHint" style="
+      border:1px dashed var(--border);
+      padding:24px;
+      text-align:center;
+      color:var(--text-dim);
+      font-size:13px;
+      cursor:pointer;
+      margin-bottom:14px;
+    " onclick="focusPaste()">
+      <div style="font-size:22px;margin-bottom:8px;">📋</div>
+      長押しでペースト
+    </div>
 
     <div class="parse-preview" id="preview">
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">■ パース結果</div>
-      <div style="font-size:12px;color:var(--accent2);margin-bottom:8px;" id="previewName"></div>
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">キャラクター</div>
-      <div class="preview-row" id="previewUnits"></div>
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;margin-top:8px;">運命の札・鍵</div>
-      <div class="preview-row" id="previewCards"></div>
+      <!-- 画像プレビュー上段 -->
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">キャラクター / キーオーダー</div>
+      <div id="previewUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">運命の札 / キーオーダー</div>
+      <div id="previewCards" style="display:flex;gap:4px;margin-bottom:10px;"></div>
     </div>
     <div class="parse-error" id="parseError"></div>
 
-    <div style="margin-top:14px;">
+    <div style="margin-top:4px;">
       <label>メモ（任意）</label>
       <textarea id="memoArea" placeholder="使い方・補足など" style="min-height:55px;"></textarea>
     </div>
@@ -585,15 +598,37 @@ function parseShareText(raw) {
   return { teamName, units, cards, code, uid, raw: raw.trim() };
 }
 
-// ── パース → プレビュー ───────────────────────────────
+// ── フォーカス（長押しペースト用） ───────────────────
+function focusPaste() {
+  const ta = document.getElementById('pasteArea');
+  ta.style.opacity = '1';
+  ta.style.position = 'fixed';
+  ta.style.top = '0'; ta.style.left = '0';
+  ta.style.width = '100vw'; ta.style.height = '100vh';
+  ta.style.zIndex = '9999';
+  ta.style.background = 'rgba(0,0,0,0.01)';
+  ta.focus();
+  ta.addEventListener('blur', hidePasteArea, {once:true});
+}
+function hidePasteArea() {
+  const ta = document.getElementById('pasteArea');
+  ta.style.opacity = '0';
+  ta.style.position = 'absolute';
+  ta.style.width = '1px'; ta.style.height = '1px';
+  ta.style.zIndex = '';
+}
+
+// ── パース → プレビュー（画像） ──────────────────────
 let parsedData = null;
-let targetSlotIndex = null; // どのスロットに保存するか
+let targetSlotIndex = null;
 
 function parseInput() {
+  hidePasteArea();
   const raw = document.getElementById('pasteArea').value;
   const preview = document.getElementById('preview');
   const errEl = document.getElementById('parseError');
   const saveBtn = document.getElementById('saveBtn');
+  const hint = document.getElementById('pasteHint');
   errEl.textContent = '';
   preview.classList.remove('visible');
   parsedData = null;
@@ -601,16 +636,30 @@ function parseInput() {
   if (!raw.trim()) return;
   try {
     parsedData = parseShareText(raw);
-    document.getElementById('previewName').textContent = '📋 ' + parsedData.teamName;
+
+    // 画像プレビュー
     document.getElementById('previewUnits').innerHTML =
-      parsedData.units.map(n => `<span class="preview-tag">${n}</span>`).join('');
+      parsedData.units.map(n => previewSlotHTML(n)).join('');
     document.getElementById('previewCards').innerHTML =
-      parsedData.cards.map(n => `<span class="preview-tag card-tag">${n}</span>`).join('');
+      parsedData.cards.map(n => previewSlotHTML(n)).join('');
+
+    hint.innerHTML = `<div style="font-size:11px;color:var(--accent);">✓ ${parsedData.teamName}</div>`;
     preview.classList.add('visible');
     saveBtn.disabled = false;
   } catch(e) {
     errEl.textContent = '⚠ ' + e.message;
+    hint.innerHTML = `<div style="font-size:22px;margin-bottom:8px;">📋</div>長押しでペースト`;
   }
+}
+
+function previewSlotHTML(name) {
+  const imgSrc = getUnitImg(name) || getCardImg(name);
+  return `<div style="flex:1;aspect-ratio:250/388;background:var(--surface2);border:1px solid var(--border);overflow:hidden;position:relative;max-width:60px;">
+    ${imgSrc
+      ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;">`
+      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--border);">✦</div>`
+    }
+  </div>`;
 }
 
 // ── 保存 ──────────────────────────────────────────────
@@ -693,9 +742,10 @@ function showToast() {
 }
 
 // ── スロットHTML ──────────────────────────────────────
-function slotHTML(name, type) {
-  const imgSrc = type === 'unit' ? getUnitImg(name) : getCardImg(name);
-  return `<div class="slot ${type}">
+function slotHTML(name) {
+  // unitMap・cardMap両方チェック
+  const imgSrc = getUnitImg(name) || getCardImg(name);
+  return `<div class="slot">
     ${imgSrc
       ? `<img src="${imgSrc}" alt="${name}" loading="lazy">`
       : `<div class="slot-placeholder">✦</div>`}
@@ -748,10 +798,10 @@ function render() {
           </div>
         </div>
         <div class="slots-row">
-          ${d.units.map(n => slotHTML(n, 'unit')).join('')}
+          ${d.units.map(n => slotHTML(n)).join('')}
         </div>
         <div class="slots-row">
-          ${d.cards.map(n => slotHTML(n, 'card')).join('')}
+          ${d.cards.map(n => slotHTML(n)).join('')}
         </div>
         ${d.memo ? `<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">${escHtml(d.memo)}</div>` : ''}
       </div>`;
@@ -802,6 +852,7 @@ function resetModal() {
   document.getElementById('preview').classList.remove('visible');
   document.getElementById('parseError').textContent = '';
   document.getElementById('saveBtn').disabled = true;
+  document.getElementById('pasteHint').innerHTML = `<div style="font-size:22px;margin-bottom:8px;">📋</div>長押しでペースト`;
   parsedData = null;
 }
 
@@ -883,9 +934,104 @@ function renderTestGrid(type) {
   }).join('');
 }
 
+// ── メイン画面 長押しペースト ─────────────────────────
+// 画面全体の長押しを検知してクリップボードからパース
+let longPressTimer = null;
+
+document.addEventListener('contextmenu', e => {
+  // モーダルが開いていたら無視
+  if (document.getElementById('modal').classList.contains('open')) return;
+  if (document.getElementById('testModal').classList.contains('open')) return;
+  e.preventDefault();
+  tryPasteFromClipboard();
+});
+
+async function tryPasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text.trim()) return;
+    handleMainPaste(text);
+  } catch {
+    // clipboard APIが使えない場合は隠しtextareaフォーカス
+    showMainPasteArea();
+  }
+}
+
+function showMainPasteArea() {
+  const ta = document.getElementById('mainPasteArea');
+  ta.value = '';
+  ta.style.opacity = '0.01';
+  ta.style.zIndex = '9999';
+  ta.focus();
+}
+
+function handleMainPaste(text) {
+  try {
+    const parsed = parseShareText(text);
+    showPastePopup(parsed, text);
+  } catch(e) {
+    // パース失敗は無視
+  }
+}
+
+function showPastePopup(parsed, rawText) {
+  document.getElementById('popupTeamName').textContent = parsed.teamName;
+  document.getElementById('popupUnits').innerHTML = parsed.units.map(n => previewSlotHTML(n)).join('');
+  document.getElementById('popupCards').innerHTML = parsed.cards.map(n => previewSlotHTML(n)).join('');
+  window._pendingParsed = { parsed, rawText };
+  document.getElementById('pastePopup').classList.add('open');
+}
+
+function closePastePopup() {
+  document.getElementById('pastePopup').classList.remove('open');
+  window._pendingParsed = null;
+}
+
+function confirmPastePopup() {
+  if (!window._pendingParsed) return;
+  const { parsed, rawText } = window._pendingParsed;
+  const slots = loadSlots();
+  const emptyIdx = slots.findIndex(s => !s.data);
+  if (emptyIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
+  slots[emptyIdx].data = {
+    units: parsed.units,
+    cards: parsed.cards,
+    code: parsed.code,
+    uid: parsed.uid,
+    raw: rawText.trim(),
+    memo: '',
+    savedAt: new Date().toLocaleDateString('ja-JP')
+  };
+  saveSlots(slots);
+  closePastePopup();
+  render();
+}
+
 // ── 起動 ──────────────────────────────────────────────
 render();
 </script>
+
+<!-- メイン画面用 隠しtextarea -->
+<textarea id="mainPasteArea" oninput="handleMainPaste(this.value)" style="position:fixed;top:0;left:0;width:100vw;height:100vh;opacity:0.01;z-index:-1;background:transparent;border:none;resize:none;"></textarea>
+
+<!-- ペーストポップアップ -->
+<div class="modal-overlay" id="pastePopup">
+  <div class="modal" style="width:480px;">
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">編成を検出しました</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--accent);margin-bottom:14px;" id="popupTeamName"></div>
+    <button class="modal-close" onclick="closePastePopup()">✕</button>
+
+    <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">キャラクター / キーオーダー</div>
+    <div id="popupUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
+    <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">運命の札 / キーオーダー</div>
+    <div id="popupCards" style="display:flex;gap:4px;margin-bottom:16px;"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePastePopup()">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmPastePopup()">次の空きスロットに保存</button>
+    </div>
+  </div>
+</div>
 
 <!-- テスト用ボタン（ページ末尾） -->
 <div style="max-width:1200px;margin:0 auto;padding:16px 16px 40px;display:flex;justify-content:flex-end;">
