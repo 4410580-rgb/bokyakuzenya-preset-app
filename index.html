@@ -355,10 +355,8 @@
 
     <div class="parse-preview" id="preview">
       <!-- 画像プレビュー上段 -->
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">キャラクター / キーオーダー</div>
-      <div id="previewUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
-      <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">運命の札 / キーオーダー</div>
-      <div id="previewCards" style="display:flex;gap:4px;margin-bottom:10px;"></div>
+    <div id="previewUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
+    <div id="previewCards" style="display:flex;gap:4px;margin-bottom:10px;"></div>
     </div>
     <div class="parse-error" id="parseError"></div>
 
@@ -984,12 +982,14 @@ function showPastePopup(parsed, rawText) {
 
 function closePastePopup() {
   document.getElementById('pastePopup').classList.remove('open');
+  document.getElementById('popupMemo').value = '';
   window._pendingParsed = null;
 }
 
 function confirmPastePopup() {
   if (!window._pendingParsed) return;
   const { parsed, rawText } = window._pendingParsed;
+  const memo = document.getElementById('popupMemo').value.trim();
   const slots = loadSlots();
   const emptyIdx = slots.findIndex(s => !s.data);
   if (emptyIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
@@ -999,7 +999,7 @@ function confirmPastePopup() {
     code: parsed.code,
     uid: parsed.uid,
     raw: rawText.trim(),
-    memo: '',
+    memo,
     savedAt: new Date().toLocaleDateString('ja-JP')
   };
   saveSlots(slots);
@@ -1021,10 +1021,11 @@ render();
     <div style="font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--accent);margin-bottom:14px;" id="popupTeamName"></div>
     <button class="modal-close" onclick="closePastePopup()">✕</button>
 
-    <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">キャラクター / キーオーダー</div>
     <div id="popupUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
-    <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;">運命の札 / キーオーダー</div>
     <div id="popupCards" style="display:flex;gap:4px;margin-bottom:16px;"></div>
+
+    <label>メモ（任意）</label>
+    <textarea id="popupMemo" placeholder="使い方・補足など" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Noto Serif JP',serif;font-size:12px;padding:10px;resize:vertical;min-height:55px;outline:none;margin-bottom:4px;"></textarea>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closePastePopup()">キャンセル</button>
