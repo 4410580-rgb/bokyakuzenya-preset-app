@@ -138,11 +138,12 @@
     gap: 8px;
   }
   .deck-number {
-    font-family: 'Cormorant Garamond', serif;
+    font-family: 'Noto Serif JP', serif;
     font-size: 11px;
     color: var(--text-dim);
     min-width: 24px;
     flex-shrink: 0;
+    line-height: 1;
   }
 
   /* チーム名インライン編集 */
@@ -336,22 +337,21 @@
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;" id="modalTitle"></div>
     <button class="modal-close" onclick="closeModal()">✕</button>
 
-    <!-- 隠しtextarea（長押しペースト用） -->
-    <textarea id="pasteArea" oninput="parseInput()" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;"></textarea>
-
-    <!-- ペースト待機 / パース結果 -->
-    <div id="pasteHint" style="
+    <!-- 直接ペーストできるtextarea -->
+    <textarea id="pasteArea" oninput="parseInput()" placeholder="共有テキストをここに長押しでペースト" style="
+      width:100%;
+      background:var(--surface2);
       border:1px dashed var(--border);
-      padding:24px;
-      text-align:center;
-      color:var(--text-dim);
-      font-size:13px;
-      cursor:pointer;
+      color:var(--text);
+      font-family:'Noto Serif JP',serif;
+      font-size:12px;
+      padding:16px;
+      resize:none;
+      height:80px;
+      outline:none;
       margin-bottom:14px;
-    " onclick="focusPaste()">
-      <div style="font-size:22px;margin-bottom:8px;">📋</div>
-      長押しでペースト
-    </div>
+      transition:border-color 0.2s;
+    "></textarea>
 
     <div class="parse-preview" id="preview">
       <!-- 画像プレビュー上段 -->
@@ -621,12 +621,10 @@ let parsedData = null;
 let targetSlotIndex = null;
 
 function parseInput() {
-  hidePasteArea();
   const raw = document.getElementById('pasteArea').value;
   const preview = document.getElementById('preview');
   const errEl = document.getElementById('parseError');
   const saveBtn = document.getElementById('saveBtn');
-  const hint = document.getElementById('pasteHint');
   errEl.textContent = '';
   preview.classList.remove('visible');
   parsedData = null;
@@ -634,19 +632,14 @@ function parseInput() {
   if (!raw.trim()) return;
   try {
     parsedData = parseShareText(raw);
-
-    // 画像プレビュー
     document.getElementById('previewUnits').innerHTML =
       parsedData.units.map(n => previewSlotHTML(n)).join('');
     document.getElementById('previewCards').innerHTML =
       parsedData.cards.map(n => previewSlotHTML(n)).join('');
-
-    hint.innerHTML = `<div style="font-size:11px;color:var(--accent);">✓ ${parsedData.teamName}</div>`;
     preview.classList.add('visible');
     saveBtn.disabled = false;
   } catch(e) {
     errEl.textContent = '⚠ ' + e.message;
-    hint.innerHTML = `<div style="font-size:22px;margin-bottom:8px;">📋</div>長押しでペースト`;
   }
 }
 
@@ -850,7 +843,6 @@ function resetModal() {
   document.getElementById('preview').classList.remove('visible');
   document.getElementById('parseError').textContent = '';
   document.getElementById('saveBtn').disabled = true;
-  document.getElementById('pasteHint').innerHTML = `<div style="font-size:22px;margin-bottom:8px;">📋</div>長押しでペースト`;
   parsedData = null;
 }
 
