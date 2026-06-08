@@ -820,9 +820,8 @@ function render() {
     const num = String(i + 1).padStart(2, '0');
 
     if (!slot.data) {
-      // 空スロット
       return `
-        <div class="deck-card empty" onclick="openSlotModal(${i})">
+        <div class="deck-card empty" onclick="openSlotModal(${i})" data-index="${i}" data-search="">
           <div class="deck-header">
             <span class="deck-number">${num}</span>
             <div class="deck-name-wrap">
@@ -1029,7 +1028,13 @@ document.addEventListener('contextmenu', e => {
   if (document.getElementById('modal').classList.contains('open')) return;
   if (document.getElementById('testModal').classList.contains('open')) return;
   if (sortMode) return;
+
+  // 長押しした場所がスロット枠内かチェック
+  const card = e.target.closest('.deck-card[data-index]');
+  if (!card) return; // 枠外は無視
   e.preventDefault();
+
+  window._pasteTargetIndex = parseInt(card.dataset.index);
   tryPasteFromClipboard();
 });
 
@@ -1063,12 +1068,13 @@ function handleMainPaste(text) {
 
 function showPastePopup(parsed, rawText) {
   const slots = loadSlots();
+  const idx = window._pasteTargetIndex;
   let destLabel = '';
-  if (targetSlotIndex !== null) {
-    destLabel = slots[targetSlotIndex].label;
+  if (idx !== null) {
+    destLabel = slots[idx].label;
   } else {
     const emptyIdx = slots.findIndex(s => !s.data);
-    destLabel = emptyIdx >= 0 ? slots[emptyIdx].label : '？';
+    destLabel = emptyIdx >= 0 ? slots[emptyIdx].label : '空きなし';
   }
   document.getElementById('popupTeamName').textContent = parsed.teamName + '　→　' + destLabel + ' に保存';
   document.getElementById('popupUnits').innerHTML = parsed.units.map(n => previewSlotHTML(n)).join('');
@@ -1089,8 +1095,9 @@ function confirmPastePopup() {
   const memo = document.getElementById('popupMemo').value.trim();
   const slots = loadSlots();
 
-  // モーダルで開いていたスロットがあればそこに、なければ次の空き
-  let destIdx = targetSlotIndex !== null ? targetSlotIndex : slots.findIndex(s => !s.data);
+  // 長押し位置のスロットがあればそこに、なければ次の空き
+  const idx = window._pasteTargetIndex;
+  let destIdx = (idx !== null) ? idx : slots.findIndex(s => !s.data);
   if (destIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
 
   slots[destIdx].data = {
