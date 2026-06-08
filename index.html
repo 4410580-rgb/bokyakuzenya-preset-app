@@ -1023,9 +1023,9 @@ render();
 let longPressTimer = null;
 
 document.addEventListener('contextmenu', e => {
-  // モーダルが開いていたら無視
   if (document.getElementById('modal').classList.contains('open')) return;
   if (document.getElementById('testModal').classList.contains('open')) return;
+  if (sortMode) return;
   e.preventDefault();
   tryPasteFromClipboard();
 });
@@ -1228,7 +1228,6 @@ function addDragHandlers(el, index) {
 
 function updateTeamNumbers(slots) {
   slots.forEach((slot, i) => {
-    // 先頭が「チームN」パターンなら番号を更新
     slot.label = slot.label.replace(/^チーム\d+/, 'チーム' + (i + 1));
   });
 }
