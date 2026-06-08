@@ -352,7 +352,12 @@
 <header>
   <div class="logo">忘却前夜<span>編成アーカイブ</span></div>
   <div style="display:flex;gap:8px;align-items:center;">
-    <button class="icon-btn" onclick="openSearchModal()" title="検索" style="width:36px;height:36px;font-size:14px;">⌕</button>
+    <button class="icon-btn" onclick="openSearchModal()" title="検索" style="width:36px;height:36px;">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="6" cy="6" r="4"/>
+        <line x1="9.5" y1="9.5" x2="13" y2="13"/>
+      </svg>
+    </button>
     <button class="btn btn-primary" onclick="openAddModal()">＋ 編成を追加</button>
   </div>
 </header>
@@ -1134,19 +1139,29 @@ function toggleSortMode() {
 
 function addDragHandlers(el, index) {
   el.draggable = true;
-  el.addEventListener('dragstart', () => {
+
+  el.addEventListener('dragstart', e => {
+    if (!sortMode) { e.preventDefault(); return; }
     dragSrcIndex = index;
     setTimeout(() => el.classList.add('dragging'), 0);
   });
-  el.addEventListener('dragend', () => el.classList.remove('dragging'));
-  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragend', () => {
+    el.classList.remove('dragging');
+    stopAutoScroll();
+  });
+  el.addEventListener('dragover', e => {
+    if (!sortMode) return;
+    e.preventDefault();
+    el.classList.add('drag-over');
+    autoScroll(e.clientY);
+  });
   el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
   el.addEventListener('drop', e => {
     e.preventDefault();
     el.classList.remove('drag-over');
+    stopAutoScroll();
     if (dragSrcIndex === null || dragSrcIndex === index) return;
     const slots = loadSlots();
-    // データとラベルを入れ替え
     const tmp = { data: slots[dragSrcIndex].data, label: slots[dragSrcIndex].label };
     slots[dragSrcIndex].data  = slots[index].data;
     slots[dragSrcIndex].label = slots[index].label;
@@ -1155,11 +1170,75 @@ function addDragHandlers(el, index) {
     saveSlots(slots);
     dragSrcIndex = null;
     render();
-    if (sortMode) toggleSortMode(); // 並び替え後もモード維持
     sortMode = true;
     document.getElementById('grid').classList.add('sort-mode');
     document.getElementById('sortBar').classList.add('visible');
   });
+
+  // タッチ対応：カード全体長押しでドラッグ開始
+  let touchTimer = null;
+  let touchStartY = 0;
+  el.addEventListener('touchstart', e => {
+    if (!sortMode) return;
+    touchStartY = e.touches[0].clientY;
+    touchTimer = setTimeout(() => {
+      dragSrcIndex = index;
+      el.classList.add('dragging');
+    }, 400);
+  }, {passive:true});
+
+  el.addEventListener('touchmove', e => {
+    if (!sortMode || dragSrcIndex === null) return;
+    clearTimeout(touchTimer);
+    const touch = e.touches[0];
+    autoScroll(touch.clientY);
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetCard = target?.closest('.deck-card[data-index]');
+    document.querySelectorAll('.deck-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+    if (targetCard) targetCard.classList.add('drag-over');
+  }, {passive:true});
+
+  el.addEventListener('touchend', e => {
+    clearTimeout(touchTimer);
+    stopAutoScroll();
+    if (dragSrcIndex === null) return;
+    const touch = e.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetCard = target?.closest('.deck-card[data-index]');
+    document.querySelectorAll('.deck-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+    el.classList.remove('dragging');
+    if (!targetCard || parseInt(targetCard.dataset.index) === dragSrcIndex) { dragSrcIndex = null; return; }
+    const destIndex = parseInt(targetCard.dataset.index);
+    const slots = loadSlots();
+    const tmp = { data: slots[dragSrcIndex].data, label: slots[dragSrcIndex].label };
+    slots[dragSrcIndex].data  = slots[destIndex].data;
+    slots[dragSrcIndex].label = slots[destIndex].label;
+    slots[destIndex].data  = tmp.data;
+    slots[destIndex].label = tmp.label;
+    saveSlots(slots);
+    dragSrcIndex = null;
+    render();
+    sortMode = true;
+    document.getElementById('grid').classList.add('sort-mode');
+    document.getElementById('sortBar').classList.add('visible');
+  });
+}
+
+// 自動スクロール
+let scrollTimer = null;
+function autoScroll(clientY) {
+  stopAutoScroll();
+  const threshold = 80;
+  const speed = 8;
+  if (clientY < threshold) {
+    scrollTimer = setInterval(() => window.scrollBy(0, -speed), 16);
+  } else if (clientY > window.innerHeight - threshold) {
+    scrollTimer = setInterval(() => window.scrollBy(0, speed), 16);
+  }
+}
+function stopAutoScroll() {
+  clearInterval(scrollTimer);
+  scrollTimer = null;
 }
 </script>
 
