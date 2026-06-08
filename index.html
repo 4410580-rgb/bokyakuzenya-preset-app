@@ -1167,6 +1167,7 @@ function addDragHandlers(el, index) {
     slots[dragSrcIndex].label = slots[index].label;
     slots[index].data  = tmp.data;
     slots[index].label = tmp.label;
+    updateTeamNumbers(slots);
     saveSlots(slots);
     dragSrcIndex = null;
     render();
@@ -1215,6 +1216,7 @@ function addDragHandlers(el, index) {
     slots[dragSrcIndex].label = slots[destIndex].label;
     slots[destIndex].data  = tmp.data;
     slots[destIndex].label = tmp.label;
+    updateTeamNumbers(slots);
     saveSlots(slots);
     dragSrcIndex = null;
     render();
@@ -1224,7 +1226,12 @@ function addDragHandlers(el, index) {
   });
 }
 
-// 自動スクロール
+function updateTeamNumbers(slots) {
+  slots.forEach((slot, i) => {
+    // 先頭が「チームN」パターンなら番号を更新
+    slot.label = slot.label.replace(/^チーム\d+/, 'チーム' + (i + 1));
+  });
+}
 let scrollTimer = null;
 function autoScroll(clientY) {
   stopAutoScroll();
