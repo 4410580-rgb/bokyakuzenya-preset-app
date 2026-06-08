@@ -1076,7 +1076,7 @@ function showPastePopup(parsed, rawText) {
     const emptyIdx = slots.findIndex(s => !s.data);
     destLabel = emptyIdx >= 0 ? slots[emptyIdx].label : '空きなし';
   }
-  document.getElementById('popupTeamName').textContent = parsed.teamName + '　→　' + destLabel + ' に保存';
+  document.getElementById('popupTeamName').textContent = destLabel + ' に保存';
   document.getElementById('popupUnits').innerHTML = parsed.units.map(n => previewSlotHTML(n)).join('');
   document.getElementById('popupCards').innerHTML = parsed.cards.map(n => previewSlotHTML(n)).join('');
   window._pendingParsed = { parsed, rawText };
