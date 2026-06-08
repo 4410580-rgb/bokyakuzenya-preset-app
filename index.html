@@ -1062,7 +1062,15 @@ function handleMainPaste(text) {
 }
 
 function showPastePopup(parsed, rawText) {
-  document.getElementById('popupTeamName').textContent = parsed.teamName;
+  const slots = loadSlots();
+  let destLabel = '';
+  if (targetSlotIndex !== null) {
+    destLabel = slots[targetSlotIndex].label;
+  } else {
+    const emptyIdx = slots.findIndex(s => !s.data);
+    destLabel = emptyIdx >= 0 ? slots[emptyIdx].label : '？';
+  }
+  document.getElementById('popupTeamName').textContent = parsed.teamName + '　→　' + destLabel + ' に保存';
   document.getElementById('popupUnits').innerHTML = parsed.units.map(n => previewSlotHTML(n)).join('');
   document.getElementById('popupCards').innerHTML = parsed.cards.map(n => previewSlotHTML(n)).join('');
   window._pendingParsed = { parsed, rawText };
@@ -1080,9 +1088,12 @@ function confirmPastePopup() {
   const { parsed, rawText } = window._pendingParsed;
   const memo = document.getElementById('popupMemo').value.trim();
   const slots = loadSlots();
-  const emptyIdx = slots.findIndex(s => !s.data);
-  if (emptyIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
-  slots[emptyIdx].data = {
+
+  // モーダルで開いていたスロットがあればそこに、なければ次の空き
+  let destIdx = targetSlotIndex !== null ? targetSlotIndex : slots.findIndex(s => !s.data);
+  if (destIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
+
+  slots[destIdx].data = {
     units: parsed.units,
     cards: parsed.cards,
     code: parsed.code,
