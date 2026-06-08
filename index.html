@@ -371,7 +371,8 @@
     <button class="icon-btn" id="sortToggleBtn" onclick="toggleSortMode()" title="並び替え" style="width:32px;height:32px;font-size:13px;">⇅</button>
   </div>
   <div class="sort-bar" id="sortBar">
-    ✦ 並び替えモード — カードをドラッグして順番を変更
+    <span id="sortModeLabel">✦ 入れ替え</span>
+    <button class="icon-btn" id="sortTypeBtn" onclick="toggleSortType()" style="font-size:11px;width:auto;padding:0 10px;">→ 差し込みに切替</button>
     <button class="icon-btn" onclick="toggleSortMode()" style="margin-left:auto;font-size:11px;width:auto;padding:0 10px;">完了</button>
   </div>
   <div class="grid" id="grid"></div>
@@ -1145,6 +1146,7 @@ document.getElementById('searchModal').addEventListener('click', e => {
 
 // ── 並び替え ──────────────────────────────────────────
 let sortMode = false;
+let sortType = 'swap'; // 'swap' = 入れ替え, 'insert' = 差し込み
 let dragSrcIndex = null;
 
 function toggleSortMode() {
@@ -1156,6 +1158,42 @@ function toggleSortMode() {
   bar.classList.toggle('visible', sortMode);
   btn.style.borderColor = sortMode ? 'var(--accent)' : 'var(--border)';
   btn.style.color = sortMode ? 'var(--accent)' : 'var(--text-dim)';
+}
+
+function toggleSortType() {
+  sortType = sortType === 'swap' ? 'insert' : 'swap';
+  document.getElementById('sortModeLabel').textContent =
+    sortType === 'swap' ? '✦ 入れ替え' : '✦ 差し込み';
+  document.getElementById('sortTypeBtn').textContent =
+    sortType === 'swap' ? '→ 差し込みに切替' : '→ 入れ替えに切替';
+}
+
+function applySort(slots, src, dest) {
+  if (sortType === 'swap') {
+    // 入れ替え
+    const tmp = { data: slots[src].data, label: slots[src].label };
+    slots[src].data  = slots[dest].data;
+    slots[src].label = slots[dest].label;
+    slots[dest].data  = tmp.data;
+    slots[dest].label = tmp.label;
+  } else {
+    // 差し込み：srcをdestの位置に挿入、間をずらす
+    const moved = { data: slots[src].data, label: slots[src].label };
+    if (src < dest) {
+      for (let i = src; i < dest; i++) {
+        slots[i].data  = slots[i+1].data;
+        slots[i].label = slots[i+1].label;
+      }
+    } else {
+      for (let i = src; i > dest; i--) {
+        slots[i].data  = slots[i-1].data;
+        slots[i].label = slots[i-1].label;
+      }
+    }
+    slots[dest].data  = moved.data;
+    slots[dest].label = moved.label;
+  }
+  updateTeamNumbers(slots);
 }
 
 function addDragHandlers(el, index) {
@@ -1183,12 +1221,7 @@ function addDragHandlers(el, index) {
     stopAutoScroll();
     if (dragSrcIndex === null || dragSrcIndex === index) return;
     const slots = loadSlots();
-    const tmp = { data: slots[dragSrcIndex].data, label: slots[dragSrcIndex].label };
-    slots[dragSrcIndex].data  = slots[index].data;
-    slots[dragSrcIndex].label = slots[index].label;
-    slots[index].data  = tmp.data;
-    slots[index].label = tmp.label;
-    updateTeamNumbers(slots);
+    applySort(slots, dragSrcIndex, index);
     saveSlots(slots);
     dragSrcIndex = null;
     render();
@@ -1232,12 +1265,7 @@ function addDragHandlers(el, index) {
     if (!targetCard || parseInt(targetCard.dataset.index) === dragSrcIndex) { dragSrcIndex = null; return; }
     const destIndex = parseInt(targetCard.dataset.index);
     const slots = loadSlots();
-    const tmp = { data: slots[dragSrcIndex].data, label: slots[dragSrcIndex].label };
-    slots[dragSrcIndex].data  = slots[destIndex].data;
-    slots[dragSrcIndex].label = slots[destIndex].label;
-    slots[destIndex].data  = tmp.data;
-    slots[destIndex].label = tmp.label;
-    updateTeamNumbers(slots);
+    applySort(slots, dragSrcIndex, destIndex);
     saveSlots(slots);
     dragSrcIndex = null;
     render();
