@@ -73,6 +73,7 @@
     clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
   }
   .btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
   .btn-ghost {
     background: transparent;
     color: var(--text-dim);
@@ -107,6 +108,14 @@
     padding: 14px;
     position: relative;
     transition: border-color 0.25s, box-shadow 0.25s;
+    cursor: pointer;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .deck-card input, .deck-card textarea {
+    -webkit-user-select: text;
+    user-select: text;
   }
   .deck-card::before {
     content: '';
@@ -123,7 +132,6 @@
   /* 空スロット：クリックで編成入力 */
   .deck-card.empty {
     border-style: dashed;
-    cursor: pointer;
     opacity: 0.5;
     transition: opacity 0.2s, border-color 0.2s;
   }
@@ -396,14 +404,14 @@
   </div>
 </div>
 
-<!-- 編成入力モーダル（追加 & 上書き共用） -->
+<!-- 編成入力モーダル（追加 & 上書き & メモ編集 共用） -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;" id="modalTitle"></div>
     <button class="modal-close" onclick="closeModal()">✕</button>
 
     <!-- 直接ペーストできるtextarea -->
-    <textarea id="pasteArea" oninput="parseInput()" placeholder="共有テキストをここに長押しでペースト" style="
+    <textarea id="pasteArea" placeholder="共有テキストをここに長押しでペースト" style="
       width:100%;
       background:var(--surface2);
       border:1px dashed var(--border);
@@ -418,6 +426,9 @@
       transition:border-color 0.2s;
     "></textarea>
 
+    <!-- 既存編成を上書きしたい時に押すボタン（メモ編集時のみ表示） -->
+    <button class="btn btn-ghost" id="overwriteBtn" style="display:none;margin-bottom:14px;">テキストを貼り付けて上書き</button>
+
     <div class="parse-preview" id="preview">
       <!-- 画像プレビュー上段 -->
     <div id="previewUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
@@ -431,9 +442,29 @@
     </div>
 
     <div class="modal-footer">
-      <button class="btn btn-ghost btn-danger" id="clearBtn" onclick="clearFromModal()" style="display:none;margin-right:auto;border-color:var(--danger);color:var(--danger);">編成を消去</button>
+      <button class="btn btn-ghost btn-danger" id="clearBtn" style="display:none;margin-right:auto;border-color:var(--danger);color:var(--danger);">編成を消去</button>
       <button class="btn btn-ghost" onclick="closeModal()">キャンセル</button>
-      <button class="btn btn-primary" id="saveBtn" onclick="saveDeck()" disabled>編成を保存</button>
+      <button class="btn btn-primary" id="saveBtn" disabled>編成を保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ペーストポップアップ -->
+<div class="modal-overlay" id="pastePopup">
+  <div class="modal" style="width:480px;">
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">編成を検出しました</div>
+    <div style="font-family:'Noto Serif JP',serif;font-size:16px;font-weight:600;color:var(--accent);margin-bottom:14px;" id="popupTeamName"></div>
+    <button class="modal-close" onclick="closePastePopup()">✕</button>
+
+    <div id="popupUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
+    <div id="popupCards" style="display:flex;gap:4px;margin-bottom:16px;"></div>
+
+    <label>メモ（任意）</label>
+    <textarea id="popupMemo" placeholder="使い方・補足など" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Noto Serif JP',serif;font-size:12px;padding:10px;resize:vertical;min-height:55px;outline:none;margin-bottom:4px;"></textarea>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closePastePopup()">キャンセル</button>
+      <button class="btn btn-primary" onclick="confirmPastePopup()">編成を保存</button>
     </div>
   </div>
 </div>
@@ -486,6 +517,14 @@ const unitMap = {
   'オルラ':       'オルラ.png',
   'カレン':       'カレン.png',
 };
+// キーオーダー（cardMap先頭24件と同一の名前リスト）
+const KEY_ORDER_NAMES = [
+  '頭の中の音','小さな願い','鼠の知恵','純白の出会い','注射の加護',
+  '永遠の執念','不朽の葬儀','唯一の種子','不平等な交換','最後の誓い',
+  'オレッタの宝物','咆哮する血と砂','傍き永遠','腐敗の饗宴','骨を蝕む抱擁',
+  '湖畔の回想','回帰の扉を越え','灰霧の正体','真夏の夢','薔薇の勝利',
+  '神の御業','巨人の覇道','すべてが彼女','海の祭'
+];
 const cardMap = {
   // キーオーダー (24)
   '頭の中の音':       '頭の中の音.png',
@@ -618,21 +657,34 @@ const cardMap = {
 function getUnitImg(name) { const f=unitMap[name]; return f?IMAGE_BASE+'units/'+f:null; }
 function getCardImg(name) { const f=cardMap[name]; return f?IMAGE_BASE+'cards/'+f:null; }
 
+// 【修正7】一覧をマップから自動導出（二重管理の解消）
+const KEY_ORDER_SET = new Set(KEY_ORDER_NAMES);
+const ALL_UNITS = Object.keys(unitMap);
+const ALL_KEYS  = KEY_ORDER_NAMES;
+const ALL_CARDS = Object.keys(cardMap).filter(n => !KEY_ORDER_SET.has(n));
+
 // ── ストレージ ────────────────────────────────────────
 const STORAGE_KEY = 'amnesia_decks_v2';
 const MAX_SLOTS = 100;
 
+// 【修正5】保存データの長さが違っても破棄せず引き継ぐ（旧50スロット版からの移行対応）
 function loadSlots() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(saved) && saved.length === MAX_SLOTS) return saved;
-  } catch {}
-  // 初期化：50スロット全部空
-  return Array.from({length: MAX_SLOTS}, (_, i) => ({
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch {}
+  const base = Array.from({length: MAX_SLOTS}, (_, i) => ({
     index: i,
-    label: 'チーム' + (i + 1),  // デフォルト名
-    data: null  // null = 空
+    label: 'チーム' + (i + 1),
+    data: null
   }));
+  if (Array.isArray(saved)) {
+    saved.slice(0, MAX_SLOTS).forEach((s, i) => {
+      if (s && typeof s === 'object') {
+        if (typeof s.label === 'string' && s.label) base[i].label = s.label;
+        if (s.data) base[i].data = s.data;
+      }
+    });
+  }
+  return base;
 }
 
 function saveSlots(slots) {
@@ -661,29 +713,10 @@ function parseShareText(raw) {
   return { teamName, units, cards, code, uid, raw: raw.trim() };
 }
 
-// ── フォーカス（長押しペースト用） ───────────────────
-function focusPaste() {
-  const ta = document.getElementById('pasteArea');
-  ta.style.opacity = '1';
-  ta.style.position = 'fixed';
-  ta.style.top = '0'; ta.style.left = '0';
-  ta.style.width = '100vw'; ta.style.height = '100vh';
-  ta.style.zIndex = '9999';
-  ta.style.background = 'rgba(0,0,0,0.01)';
-  ta.focus();
-  ta.addEventListener('blur', hidePasteArea, {once:true});
-}
-function hidePasteArea() {
-  const ta = document.getElementById('pasteArea');
-  ta.style.opacity = '0';
-  ta.style.position = 'absolute';
-  ta.style.width = '1px'; ta.style.height = '1px';
-  ta.style.zIndex = '';
-}
-
 // ── パース → プレビュー（画像） ──────────────────────
 let parsedData = null;
 let targetSlotIndex = null;
+let pasteTargetIndex = null;
 
 function parseInput() {
   const raw = document.getElementById('pasteArea').value;
@@ -693,7 +726,10 @@ function parseInput() {
   errEl.textContent = '';
   preview.classList.remove('visible');
   parsedData = null;
-  saveBtn.disabled = true;
+  // 既存データありの場合はメモのみ保存可、なければパース成功まで保存不可
+  const slots = loadSlots();
+  const hasData = targetSlotIndex !== null && !!slots[targetSlotIndex].data;
+  saveBtn.disabled = !hasData;
   if (!raw.trim()) return;
   try {
     parsedData = parseShareText(raw);
@@ -725,7 +761,6 @@ function saveDeck() {
 
   if (targetSlotIndex !== null) {
     if (parsedData) {
-      // 新しいテキストがパースされている → フル上書き
       slots[targetSlotIndex].data = {
         units: parsedData.units,
         cards: parsedData.cards,
@@ -736,7 +771,6 @@ function saveDeck() {
         savedAt: new Date().toLocaleDateString('ja-JP')
       };
     } else if (slots[targetSlotIndex].data) {
-      // パースなし・既存データあり → メモのみ更新
       slots[targetSlotIndex].data.memo = memo;
     }
   } else {
@@ -765,19 +799,8 @@ function saveLabel(index, value) {
   saveSlots(slots);
 }
 
-// ── 削除 ──────────────────────────────────────────────
-function clearSlot(index, e) {
-  e.stopPropagation();
-  if (!confirm('この編成をクリアしますか？')) return;
-  const slots = loadSlots();
-  slots[index].data = null;
-  saveSlots(slots);
-  render();
-}
-
 // ── コピー ────────────────────────────────────────────
-function copyRaw(raw, e) {
-  if (e) e.stopPropagation();
+function copyRaw(raw) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(raw).then(() => showToast()).catch(() => fallbackCopy(raw));
   } else {
@@ -795,19 +818,19 @@ function fallbackCopy(raw) {
   try { document.execCommand('copy'); showToast(); } catch {}
   document.body.removeChild(ta);
 }
-function showToast() {
+function showToast(msg) {
   const t = document.getElementById('toast');
+  t.textContent = msg || 'テキストをコピーしました';
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 
 // ── スロットHTML ──────────────────────────────────────
 function slotHTML(name) {
-  // unitMap・cardMap両方チェック
   const imgSrc = getUnitImg(name) || getCardImg(name);
   return `<div class="slot">
     ${imgSrc
-      ? `<img src="${imgSrc}" alt="${name}" loading="lazy">`
+      ? `<img src="${imgSrc}" alt="${escHtml(name)}" loading="lazy">`
       : `<div class="slot-placeholder">✦</div>`}
   </div>`;
 }
@@ -817,25 +840,25 @@ function render() {
   const slots = loadSlots();
   const grid = document.getElementById('grid');
 
+  // 【修正4】rawテキストをonclick属性に埋め込まない（引用符で属性が壊れるバグの解消）
   grid.innerHTML = slots.map((slot, i) => {
     const num = String(i + 1).padStart(2, '0');
 
     if (!slot.data) {
       return `
-        <div class="deck-card empty" onclick="openSlotModal(${i})" data-index="${i}" data-search="">
+        <div class="deck-card empty" data-index="${i}" data-search="">
           <div class="deck-header">
             <span class="deck-number">${num}</span>
             <div class="deck-name-wrap">
               <input class="deck-name-input" value="${escHtml(slot.label)}"
                 placeholder="チーム名"
-                onclick="event.stopPropagation()"
                 onchange="saveLabel(${i}, this.value)"
               >
             </div>
           </div>
           <div class="empty-slots-hint">
             <span class="plus">＋</span>
-            <span>編成を貼り付けて入力</span>
+            <span>タップ または 長押しペーストで入力</span>
           </div>
         </div>`;
     }
@@ -843,18 +866,17 @@ function render() {
     const d = slot.data;
     const searchText = [slot.label, ...d.units, ...d.cards, d.memo||''].join(' ').toLowerCase();
     return `
-      <div class="deck-card" onclick="openSlotModal(${i})" data-index="${i}" data-search="${escHtml(searchText)}">
+      <div class="deck-card" data-index="${i}" data-search="${escHtml(searchText)}">
         <div class="deck-header">
           <span class="deck-number">${num}</span>
           <div class="deck-name-wrap">
             <input class="deck-name-input" value="${escHtml(slot.label)}"
               placeholder="チーム名"
-              onclick="event.stopPropagation()"
               onchange="saveLabel(${i}, this.value)"
             >
           </div>
           <div class="deck-actions">
-            <button class="icon-btn" title="コピー" onclick='copyRaw(${JSON.stringify(d.raw)}, event)'>⎘</button>
+            <button class="icon-btn copy-btn" data-index="${i}" title="コピー">⎘</button>
           </div>
         </div>
         <div class="slots-row">
@@ -867,9 +889,11 @@ function render() {
       </div>`;
   }).join('');
 
-  // ドラッグハンドラを付与
+  // カードごとのハンドラ（並び替えドラッグ＋長押しペースト）
   document.querySelectorAll('.deck-card[data-index]').forEach(el => {
-    addDragHandlers(el, parseInt(el.dataset.index));
+    const idx = parseInt(el.dataset.index);
+    addDragHandlers(el, idx);
+    addLongPressHandlers(el, idx);
   });
 
   // 検索状態を維持
@@ -881,198 +905,113 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── モーダル ──────────────────────────────────────────
-function openAddModal() {
-  const slots = loadSlots();
-  const emptyIdx = slots.findIndex(s => !s.data);
-  if (emptyIdx < 0) { alert('スロットが全て埋まっています（100/100）'); return; }
-  targetSlotIndex = null;
-  document.getElementById('modalTitle').textContent = '編成を追加';
-  document.getElementById('clearBtn').style.display = 'none';
-  resetModal();
-  document.getElementById('modal').classList.add('open');
-}
-
-function clearFromModal() {
-  if (!confirm('この編成を消去しますか？')) return;
-  const slots = loadSlots();
-  slots[targetSlotIndex].data = null;
-  saveSlots(slots);
-  closeModal();
-  render();
-}
-
-function openSlotModal(index) {
-  targetSlotIndex = index;
-  const slots = loadSlots();
-  const label = slots[index].label;
-  const hasData = !!slots[index].data;
-
-  document.getElementById('modalTitle').textContent =
-    hasData ? 'メモを編集 — ' + label : '編成を入力 — ' + label;
-  document.getElementById('clearBtn').style.display = hasData ? 'flex' : 'none';
-
-  // 既存編成がある場合：ペーストエリアを隠してメモだけ表示
-  const pasteArea = document.getElementById('pasteArea');
-  const pasteHintDiv = pasteArea;
-  if (hasData) {
-    pasteArea.style.display = 'none';
-    document.getElementById('preview').classList.remove('visible');
-    // 既存メモを読み込む
-    document.getElementById('memoArea').value = slots[index].data.memo || '';
-    document.getElementById('saveBtn').disabled = false;
-  } else {
-    pasteArea.style.display = 'block';
-    document.getElementById('memoArea').value = '';
-    document.getElementById('saveBtn').disabled = true;
+// ── グリッドのクリック（イベントデリゲーション） ──────
+document.getElementById('grid').addEventListener('click', e => {
+  // コピーボタン
+  const copyBtn = e.target.closest('.copy-btn');
+  if (copyBtn) {
+    e.stopPropagation();
+    const i = parseInt(copyBtn.dataset.index);
+    const slot = loadSlots()[i];
+    if (slot && slot.data) copyRaw(slot.data.raw);
+    return;
   }
-
-  document.getElementById('parseError').textContent = '';
-  parsedData = null;
-  document.getElementById('modal').classList.add('open');
-}
-
-function resetModal() {
-  document.getElementById('pasteArea').value = '';
-  document.getElementById('pasteArea').style.display = 'block';
-  document.getElementById('memoArea').value = '';
-  document.getElementById('preview').classList.remove('visible');
-  document.getElementById('parseError').textContent = '';
-  document.getElementById('saveBtn').disabled = true;
-  parsedData = null;
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.remove('open');
-}
-document.getElementById('modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal')) closeModal();
-});
-
-// ── 画像テスト用データ ────────────────────────────────
-const ALL_KEYS = [
-  '頭の中の音','小さな願い','鼠の知恵','純白の出会い','注射の加護',
-  '永遠の執念','不朽の葬儀','唯一の種子','不平等な交換','最後の誓い',
-  'オレッタの宝物','咆哮する血と砂','傍き永遠','腐敗の饗宴','骨を蝕む抱擁',
-  '湖畔の回想','回帰の扉を越え','灰霧の正体','真夏の夢','薔薇の勝利',
-  '神の御業','巨人の覇道','すべてが彼女','海の祭'
-];
-const ALL_UNITS = [
-  'アルバ','リリー','アイギス','エリカ','ウインクル','オジール','サンガー',
-  'ワンダ','ファイント','アグリッパ','ロータン','「24」','ミリアム',
-  '環行・ラモンナ','マーフィー','パンディア','ナウティラ','ソレール',
-  'ジェンキン','リッツ','オレッタ','ユウハシュ','ニムフィーア','トゥルー',
-  'ハムリン','カエクス','ライカー','ゴリアテ','サルバドル','血ノ鎖・ヘロット',
-  'ヘロット','ダフォダイル','ティンクト','ファロス','ラモンナ','カーシア',
-  'タイス','ドール','レーア','シレスト','沙耶','オルラ','カレン'
-];
-const ALL_CARDS = [
-  '35mmの魔法','アクートの春','イサラウの眼差し','カウントダウン','ギャンブルの知恵',
-  'パートナーの特訓','マジックショー','不屈の意志','信仰の力','入学の日',
-  '冬の夜の追憶','切断と危害','呟き','吸う','回れ回れ','夜に伏す','夢遊の異界',
-  '奇体の反噬','女王の戒律','存在しない場所','寵愛','導きの帆','巨人の刃',
-  '希望','幸運の時','庇護','強欲','心の障壁','忘却の手','悟り','情報は命',
-  '慈悲の育み','懲罰','捕食者の子守唄','旅の荷物','昔日の花と詩','星天の獣',
-  '時を遡る時計','暴風雨の中で','暴食','暴食寓話','核溶解','桜花の幻想',
-  '極夜と暁','欲望の海','死の分析','死を超える','氷河の眠り','永劫の演奏',
-  '永遠の鎮魂歌','汚泥の中の童話','洞察','活性','海の夢','深海の呼び声',
-  '深紅に沈む','湧出','無声の宴','熟成','熱い別れのキス','狂乱','狂魔の宴',
-  '珊瑚の女の死','疼痛の鰭','痛みを越えて','百万の寵愛の眼','神王の讃歌',
-  '神言の石板','私的な休息','秘められた誕生','箱の中の童心','精神集中',
-  '縛られた歌','職責','腐朽の贈り物','臨界点','至高の秘蔵品','花香る世界を願って',
-  '苦しみの呪縛','落日','蒼白の末裔','薔薇の名において','親友へ',
-  '計算不能な演算','記憶螺旋','記憶障害','詩の結び','貴族の杖','迷いの道',
-  '追放','運命のルーレット','銀ダラの決意','錯乱','鎖を断ち切る日',
-  '鏡の中の人','集会の時','雪山が溶けるまで','青石の玉座','騎士の心',
-  '魂の誕生','魔女のつば広帽子'
-];
-
-function openTestModal() {
-  document.getElementById('testModal').classList.add('open');
-  renderTestGrid('unit');
-}
-function closeTestModal() {
-  document.getElementById('testModal').classList.remove('open');
-}
-
-function renderTestGrid(type) {
-  // タブ表示切替
-  ['unit','card','key'].forEach(t => {
-    document.getElementById('tab-'+t).style.borderColor = t===type ? 'var(--accent)' : 'var(--border)';
-    document.getElementById('tab-'+t).style.color = t===type ? 'var(--accent)' : 'var(--text-dim)';
-  });
-
-  const list = type==='unit' ? ALL_UNITS : type==='card' ? ALL_CARDS : ALL_KEYS;
-  const grid = document.getElementById('testGrid');
-
-  grid.innerHTML = list.map(name => {
-    const imgSrc = type==='unit' ? getUnitImg(name) : getCardImg(name);
-    const ok = imgSrc !== null;
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-      <div style="width:60px;height:80px;background:var(--surface2);border:1px solid ${ok?'var(--accent)':'var(--danger)'};position:relative;overflow:hidden;">
-        ${ok
-          ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;" onerror="this.parentNode.style.borderColor='var(--danger)';this.style.display='none'">`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--danger);">✕</div>`
-        }
-      </div>
-      <div style="font-size:9px;color:${ok?'var(--text-dim)':'var(--danger)'};text-align:center;max-width:64px;line-height:1.2;">${name}</div>
-    </div>`;
-  }).join('');
-}
-
-// ── 起動 ──────────────────────────────────────────────
-render();
-// 画面全体の長押しを検知してクリップボードからパース
-let longPressTimer = null;
-
-document.addEventListener('contextmenu', e => {
-  if (document.getElementById('modal').classList.contains('open')) return;
-  if (document.getElementById('testModal').classList.contains('open')) return;
+  // チーム名入力中はモーダルを開かない
+  if (e.target.closest('.deck-name-input')) return;
+  // 並び替えモード中はタップでモーダルを開かない（誤操作防止）
   if (sortMode) return;
-
-  // 長押しした場所がスロット枠内かチェック
   const card = e.target.closest('.deck-card[data-index]');
-  if (!card) return; // 枠外は無視
-  e.preventDefault();
-
-  window._pasteTargetIndex = parseInt(card.dataset.index);
-  tryPasteFromClipboard();
+  if (!card) return;
+  openSlotModal(parseInt(card.dataset.index));
 });
 
-async function tryPasteFromClipboard() {
+// ── 長押しペースト ────────────────────────────────────
+// 【修正1】iOS Safariでは contextmenu が長押しで発火しないため、
+// touchstartベースの自前長押し判定を実装。クリップボード読み取りに
+// 失敗した場合（iOSで拒否された場合など）はモーダルのテキストエリアに
+// フォールバックし、どの環境でも必ず入力経路が確保されるようにする。
+let lastPasteFlowAt = 0;
+
+function addLongPressHandlers(el, index) {
+  let lpTimer = null;
+  let lpStartX = 0, lpStartY = 0;
+  let lpFired = false;
+
+  el.addEventListener('touchstart', e => {
+    if (sortMode) return;
+    if (e.target.closest('input, button, textarea')) return;
+    lpFired = false;
+    lpStartX = e.touches[0].clientX;
+    lpStartY = e.touches[0].clientY;
+    lpTimer = setTimeout(() => {
+      lpTimer = null;
+      lpFired = true;
+      startPasteFlow(index);
+    }, 500);
+  }, {passive: true});
+
+  el.addEventListener('touchmove', e => {
+    if (!lpTimer) return;
+    const dx = e.touches[0].clientX - lpStartX;
+    const dy = e.touches[0].clientY - lpStartY;
+    if (Math.hypot(dx, dy) > 10) { clearTimeout(lpTimer); lpTimer = null; }
+  }, {passive: true});
+
+  el.addEventListener('touchend', e => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    if (lpFired) e.preventDefault(); // 長押し成立後のタップ（モーダル開）を抑止
+  }, {passive: false});
+
+  el.addEventListener('touchcancel', () => {
+    if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+  });
+}
+
+// デスクトップ／Android向け：右クリック・OS長押しメニューも同じ動線に
+document.getElementById('grid').addEventListener('contextmenu', e => {
+  if (sortMode) return;
+  if (e.target.closest('input, textarea')) return;
+  const card = e.target.closest('.deck-card[data-index]');
+  if (!card) return;
+  e.preventDefault();
+  startPasteFlow(parseInt(card.dataset.index));
+});
+
+async function startPasteFlow(index) {
+  // touchstartタイマーとcontextmenuの二重発火ガード
+  const now = Date.now();
+  if (now - lastPasteFlowAt < 800) return;
+  lastPasteFlowAt = now;
+
+  if (navigator.vibrate) navigator.vibrate(10);
+  pasteTargetIndex = index;
+
   try {
     const text = await navigator.clipboard.readText();
-    if (!text.trim()) return;
-    handleMainPaste(text);
+    if (text && text.trim()) {
+      try {
+        const parsed = parseShareText(text);
+        showPastePopup(parsed, text);
+        return;
+      } catch {
+        // 編成テキストではない → モーダルへフォールバック
+      }
+    }
   } catch {
-    // clipboard APIが使えない場合は隠しtextareaフォーカス
-    showMainPasteArea();
+    // readText不可（iOS拒否・非対応など）→ モーダルへフォールバック
   }
+  // フォールバック：モーダルのテキストエリアに直接ペーストしてもらう
+  openSlotModal(index, true);
 }
 
-function showMainPasteArea() {
-  const ta = document.getElementById('mainPasteArea');
-  ta.value = '';
-  ta.style.opacity = '0.01';
-  ta.style.zIndex = '9999';
-  ta.focus();
-}
-
-function handleMainPaste(text) {
-  try {
-    const parsed = parseShareText(text);
-    showPastePopup(parsed, text);
-  } catch(e) {
-    // パース失敗は無視
-  }
-}
+// ── ペーストポップアップ ──────────────────────────────
+let pendingParsed = null;
 
 function showPastePopup(parsed, rawText) {
   const slots = loadSlots();
-  const idx = window._pasteTargetIndex;
   let destLabel = '';
-  if (idx !== null) {
-    destLabel = slots[idx].label;
+  if (pasteTargetIndex !== null) {
+    destLabel = slots[pasteTargetIndex].label;
   } else {
     const emptyIdx = slots.findIndex(s => !s.data);
     destLabel = emptyIdx >= 0 ? slots[emptyIdx].label : '空きなし';
@@ -1080,25 +1019,23 @@ function showPastePopup(parsed, rawText) {
   document.getElementById('popupTeamName').textContent = destLabel + ' に保存';
   document.getElementById('popupUnits').innerHTML = parsed.units.map(n => previewSlotHTML(n)).join('');
   document.getElementById('popupCards').innerHTML = parsed.cards.map(n => previewSlotHTML(n)).join('');
-  window._pendingParsed = { parsed, rawText };
+  pendingParsed = { parsed, rawText };
   document.getElementById('pastePopup').classList.add('open');
 }
 
 function closePastePopup() {
   document.getElementById('pastePopup').classList.remove('open');
   document.getElementById('popupMemo').value = '';
-  window._pendingParsed = null;
+  pendingParsed = null;
 }
 
 function confirmPastePopup() {
-  if (!window._pendingParsed) return;
-  const { parsed, rawText } = window._pendingParsed;
+  if (!pendingParsed) return;
+  const { parsed, rawText } = pendingParsed;
   const memo = document.getElementById('popupMemo').value.trim();
   const slots = loadSlots();
 
-  // 長押し位置のスロットがあればそこに、なければ次の空き
-  const idx = window._pasteTargetIndex;
-  let destIdx = (idx !== null) ? idx : slots.findIndex(s => !s.data);
+  let destIdx = (pasteTargetIndex !== null) ? pasteTargetIndex : slots.findIndex(s => !s.data);
   if (destIdx < 0) { alert('スロットが全て埋まっています'); closePastePopup(); return; }
 
   slots[destIdx].data = {
@@ -1114,6 +1051,92 @@ function confirmPastePopup() {
   closePastePopup();
   render();
 }
+document.getElementById('pastePopup').addEventListener('click', e => {
+  if (e.target === document.getElementById('pastePopup')) closePastePopup();
+});
+
+// ── モーダル ──────────────────────────────────────────
+function openAddModal() {
+  const slots = loadSlots();
+  const emptyIdx = slots.findIndex(s => !s.data);
+  if (emptyIdx < 0) { alert('スロットが全て埋まっています（100/100）'); return; }
+  targetSlotIndex = null;
+  document.getElementById('modalTitle').textContent = '編成を追加';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('overwriteBtn').style.display = 'none';
+  resetModal();
+  document.getElementById('modal').classList.add('open');
+}
+
+function clearFromModal() {
+  if (!confirm('この編成を消去しますか？')) return;
+  const slots = loadSlots();
+  slots[targetSlotIndex].data = null;
+  saveSlots(slots);
+  closeModal();
+  render();
+}
+
+// forcePaste=true：既存データがあってもペーストエリアを表示（上書き用）
+function openSlotModal(index, forcePaste = false) {
+  targetSlotIndex = index;
+  const slots = loadSlots();
+  const label = slots[index].label;
+  const hasData = !!slots[index].data;
+
+  const pasteArea = document.getElementById('pasteArea');
+  const overwriteBtn = document.getElementById('overwriteBtn');
+  pasteArea.value = '';  // 前回のペースト内容が残らないようクリア
+
+  document.getElementById('clearBtn').style.display = hasData ? 'flex' : 'none';
+
+  if (hasData && !forcePaste) {
+    // メモ編集モード
+    document.getElementById('modalTitle').textContent = 'メモを編集 — ' + label;
+    pasteArea.style.display = 'none';
+    overwriteBtn.style.display = 'flex';
+    document.getElementById('preview').classList.remove('visible');
+    document.getElementById('memoArea').value = slots[index].data.memo || '';
+    document.getElementById('saveBtn').disabled = false;
+  } else {
+    // 入力／上書きモード
+    document.getElementById('modalTitle').textContent =
+      hasData ? '編成を上書き — ' + label : '編成を入力 — ' + label;
+    pasteArea.style.display = 'block';
+    overwriteBtn.style.display = 'none';
+    document.getElementById('preview').classList.remove('visible');
+    document.getElementById('memoArea').value = hasData ? (slots[index].data.memo || '') : '';
+    document.getElementById('saveBtn').disabled = !hasData;  // 既存ありならメモのみ保存も可
+  }
+
+  document.getElementById('parseError').textContent = '';
+  parsedData = null;
+  document.getElementById('modal').classList.add('open');
+}
+
+function resetModal() {
+  const pasteArea = document.getElementById('pasteArea');
+  pasteArea.value = '';
+  pasteArea.style.display = 'block';
+  document.getElementById('memoArea').value = '';
+  document.getElementById('preview').classList.remove('visible');
+  document.getElementById('parseError').textContent = '';
+  document.getElementById('saveBtn').disabled = true;
+  parsedData = null;
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+document.getElementById('pasteArea').addEventListener('input', parseInput);
+document.getElementById('saveBtn').addEventListener('click', saveDeck);
+document.getElementById('clearBtn').addEventListener('click', clearFromModal);
+document.getElementById('overwriteBtn').addEventListener('click', () => {
+  openSlotModal(targetSlotIndex, true);
+});
 
 // ── 検索 ──────────────────────────────────────────────
 function openSearchModal() {
@@ -1170,14 +1193,12 @@ function toggleSortType() {
 
 function applySort(slots, src, dest) {
   if (sortType === 'swap') {
-    // 入れ替え
     const tmp = { data: slots[src].data, label: slots[src].label };
     slots[src].data  = slots[dest].data;
     slots[src].label = slots[dest].label;
     slots[dest].data  = tmp.data;
     slots[dest].label = tmp.label;
   } else {
-    // 差し込み：srcをdestの位置に挿入、間をずらす
     const moved = { data: slots[src].data, label: slots[src].label };
     if (src < dest) {
       for (let i = src; i < dest; i++) {
@@ -1196,9 +1217,19 @@ function applySort(slots, src, dest) {
   updateTeamNumbers(slots);
 }
 
+function finishSort(destIndex) {
+  const slots = loadSlots();
+  applySort(slots, dragSrcIndex, destIndex);
+  saveSlots(slots);
+  dragSrcIndex = null;
+  render();
+  // #grid自体のクラスはrender()のinnerHTML差し替えでは消えないため再付与は不要
+}
+
 function addDragHandlers(el, index) {
   el.draggable = true;
 
+  // ── デスクトップ：HTML5 Drag & Drop ──
   el.addEventListener('dragstart', e => {
     if (!sortMode) { e.preventDefault(); return; }
     dragSrcIndex = index;
@@ -1219,39 +1250,38 @@ function addDragHandlers(el, index) {
     e.preventDefault();
     el.classList.remove('drag-over');
     stopAutoScroll();
-    if (dragSrcIndex === null || dragSrcIndex === index) return;
-    const slots = loadSlots();
-    applySort(slots, dragSrcIndex, index);
-    saveSlots(slots);
-    dragSrcIndex = null;
-    render();
-    sortMode = true;
-    document.getElementById('grid').classList.add('sort-mode');
-    document.getElementById('sortBar').classList.add('visible');
+    if (dragSrcIndex === null || dragSrcIndex === index) { dragSrcIndex = null; return; }
+    finishSort(index);
   });
 
-  // タッチ対応：カード全体長押しでドラッグ開始
+  // ── タッチ：長押しでドラッグ開始 ──
   let touchTimer = null;
-  let touchStartY = 0;
   el.addEventListener('touchstart', e => {
     if (!sortMode) return;
-    touchStartY = e.touches[0].clientY;
     touchTimer = setTimeout(() => {
       dragSrcIndex = index;
       el.classList.add('dragging');
+      if (navigator.vibrate) navigator.vibrate(10);
     }, 400);
-  }, {passive:true});
+  }, {passive: true});
 
+  // 【修正3】passive:false にして preventDefault でページスクロールを止める。
+  // これをしないとドラッグ中に画面ごとスクロールし、autoScrollと競合する。
   el.addEventListener('touchmove', e => {
-    if (!sortMode || dragSrcIndex === null) return;
-    clearTimeout(touchTimer);
+    if (!sortMode) return;
+    if (dragSrcIndex === null) {
+      // ドラッグ開始前に指が動いた → 長押しキャンセル（普通のスクロールを許可）
+      clearTimeout(touchTimer);
+      return;
+    }
+    e.preventDefault();
     const touch = e.touches[0];
     autoScroll(touch.clientY);
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     const targetCard = target?.closest('.deck-card[data-index]');
     document.querySelectorAll('.deck-card.drag-over').forEach(c => c.classList.remove('drag-over'));
     if (targetCard) targetCard.classList.add('drag-over');
-  }, {passive:true});
+  }, {passive: false});
 
   el.addEventListener('touchend', e => {
     clearTimeout(touchTimer);
@@ -1263,15 +1293,16 @@ function addDragHandlers(el, index) {
     document.querySelectorAll('.deck-card.drag-over').forEach(c => c.classList.remove('drag-over'));
     el.classList.remove('dragging');
     if (!targetCard || parseInt(targetCard.dataset.index) === dragSrcIndex) { dragSrcIndex = null; return; }
-    const destIndex = parseInt(targetCard.dataset.index);
-    const slots = loadSlots();
-    applySort(slots, dragSrcIndex, destIndex);
-    saveSlots(slots);
+    finishSort(parseInt(targetCard.dataset.index));
+  });
+
+  // 【修正6】touchcancel（着信・通知などで中断）時の後始末
+  el.addEventListener('touchcancel', () => {
+    clearTimeout(touchTimer);
+    stopAutoScroll();
+    el.classList.remove('dragging');
+    document.querySelectorAll('.deck-card.drag-over').forEach(c => c.classList.remove('drag-over'));
     dragSrcIndex = null;
-    render();
-    sortMode = true;
-    document.getElementById('grid').classList.add('sort-mode');
-    document.getElementById('sortBar').classList.add('visible');
   });
 }
 
@@ -1295,33 +1326,56 @@ function stopAutoScroll() {
   clearInterval(scrollTimer);
   scrollTimer = null;
 }
+
+// ── テスト用一覧 ──────────────────────────────────────
+function openTestModal() {
+  document.getElementById('testModal').classList.add('open');
+  renderTestGrid('unit');
+}
+function closeTestModal() {
+  document.getElementById('testModal').classList.remove('open');
+}
+
+function renderTestGrid(type) {
+  ['unit','card','key'].forEach(t => {
+    document.getElementById('tab-'+t).style.borderColor = t===type ? 'var(--accent)' : 'var(--border)';
+    document.getElementById('tab-'+t).style.color = t===type ? 'var(--accent)' : 'var(--text-dim)';
+  });
+
+  const list = type==='unit' ? ALL_UNITS : type==='card' ? ALL_CARDS : ALL_KEYS;
+  const grid = document.getElementById('testGrid');
+
+  grid.innerHTML = list.map(name => {
+    const imgSrc = type==='unit' ? getUnitImg(name) : getCardImg(name);
+    const ok = imgSrc !== null;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+      <div style="width:60px;height:80px;background:var(--surface2);border:1px solid ${ok?'var(--accent)':'var(--danger)'};position:relative;overflow:hidden;">
+        ${ok
+          ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;object-position:top;" onerror="this.parentNode.style.borderColor='var(--danger)';this.style.display='none'">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--danger);">✕</div>`
+        }
+      </div>
+      <div style="font-size:9px;color:${ok?'var(--text-dim)':'var(--danger)'};text-align:center;max-width:64px;line-height:1.2;">${escHtml(name)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 起動 ──────────────────────────────────────────────
+render();
 </script>
 
-<!-- メイン画面用 隠しtextarea -->
-<textarea id="mainPasteArea" oninput="handleMainPaste(this.value)" style="position:fixed;top:0;left:0;width:100vw;height:100vh;opacity:0.01;z-index:-1;background:transparent;border:none;resize:none;"></textarea>
-
-<!-- ペーストポップアップ -->
-<div class="modal-overlay" id="pastePopup">
-  <div class="modal" style="width:480px;">
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;">編成を検出しました</div>
-    <div style="font-family:'Noto Serif JP',serif;font-size:16px;font-weight:600;color:var(--accent);margin-bottom:14px;" id="popupTeamName"></div>
-    <button class="modal-close" onclick="closePastePopup()">✕</button>
-
-    <div id="popupUnits" style="display:flex;gap:4px;margin-bottom:10px;"></div>
-    <div id="popupCards" style="display:flex;gap:4px;margin-bottom:16px;"></div>
-
-    <label>メモ（任意）</label>
-    <textarea id="popupMemo" placeholder="使い方・補足など" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Noto Serif JP',serif;font-size:12px;padding:10px;resize:vertical;min-height:55px;outline:none;margin-bottom:4px;"></textarea>
-
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closePastePopup()">キャンセル</button>
-      <button class="btn btn-primary" onclick="confirmPastePopup()">編成を保存</button>
-    </div>
-  </div>
-</div>
-
 <!-- テスト用ボタン（ページ末尾） -->
-<div style="max-width:1200px;margin:0 auto;padding:16px 16px 40px;display:flex;justify-content:flex-end;">
+<div style="max-width:1200px;margin:0 auto;padding:16px 16px 40px;display:flex;justify-content:flex-end;gap:8px;">
+  <button onclick="openGuide()" style="
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:'Noto Serif JP',serif;
+    font-size:10px;
+    padding:6px 10px;
+    cursor:pointer;
+    opacity:0.5;
+  ">使い方ガイド</button>
   <button onclick="openTestModal()" style="
     background:transparent;
     border:1px solid var(--border);
@@ -1333,6 +1387,76 @@ function stopAutoScroll() {
     opacity:0.5;
   ">テスト用 一覧表示</button>
 </div>
+
+<!-- ガイドモーダル -->
+<div class="modal-overlay" id="guideModal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-title">使い方ガイド</div>
+    <button class="modal-close" onclick="closeGuide()">✕</button>
+
+    <div style="display:flex;flex-direction:column;gap:18px;font-size:13px;line-height:1.7;color:var(--text);">
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">01 — 編成を保存する</div>
+        ゲーム内の対人戦画面で編成を共有テキストとしてコピーします。<br>
+        アプリに戻り、保存したいスロット枠を<strong>長押し</strong>するとクリップボードから編成を読み取り、確認画面が表示されます。<br>
+        <span style="color:var(--text-dim);font-size:11px;">※ お使いの端末で読み取りが許可されない場合は、自動的に貼り付け画面が開きます。テキスト欄を長押しして「ペースト」してください。スロットをタップしても同じ画面が開きます。</span>
+      </div>
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">02 — 編成を復元する</div>
+        保存済みの編成カードの右上にある <strong>⎘ ボタン</strong>をタップすると、共有テキストがクリップボードにコピーされます。<br>
+        ゲーム内のプリセット編成画面を開き、テキストを長押しでペーストすると編成が復元されます。
+      </div>
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">03 — チーム名を変更する</div>
+        各スロットのチーム名部分をタップして直接入力できます。<br>
+        「チーム1 毒パ」のように自由に名前をつけられます。並び替え時は先頭の番号が自動更新されます。
+      </div>
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">04 — 並び替え</div>
+        「⇅」ボタンで並び替えモードに入ります。カードを長押ししてドラッグすることで順番を変更できます。<br>
+        <strong>入れ替え</strong>（2枚を交換）と<strong>差し込み</strong>（間に挿入）を切り替えられます。
+      </div>
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">05 — 検索</div>
+        ヘッダーの検索ボタンからキャラ名・カード名・メモで編成を絞り込めます。
+      </div>
+
+      <div>
+        <div style="color:var(--accent);font-size:11px;letter-spacing:0.15em;margin-bottom:6px;">06 — メモ・上書き</div>
+        編成カードをタップすると「メモを編集」画面が開きます。立ち回りや対策などを自由に記録できます。<br>
+        「テキストを貼り付けて上書き」から、スロットを消去せずに別の編成で上書きすることもできます。
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeGuide()">はじめる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── ガイド ────────────────────────────────────────────
+function openGuide() {
+  document.getElementById('guideModal').classList.add('open');
+}
+function closeGuide() {
+  document.getElementById('guideModal').classList.remove('open');
+  localStorage.setItem('guide_seen', '1');
+}
+document.getElementById('guideModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('guideModal')) closeGuide();
+});
+// 初回のみ自動表示
+if (!localStorage.getItem('guide_seen')) {
+  openGuide();
+}
+</script>
 
 <!-- テストモーダル -->
 <div class="modal-overlay" id="testModal">
