@@ -438,7 +438,7 @@
 
     <div style="margin-top:4px;">
       <label>メモ（任意）</label>
-      <textarea id="memoArea" placeholder="使い方・補足など" style="min-height:55px;"></textarea>
+      <textarea id="memoArea" placeholder="使い方・補足など" style="min-height:clamp(140px, 40vh, 480px);white-space:pre-wrap;"></textarea>
     </div>
 
     <div class="modal-footer">
@@ -460,7 +460,7 @@
     <div id="popupCards" style="display:flex;gap:4px;margin-bottom:16px;"></div>
 
     <label>メモ（任意）</label>
-    <textarea id="popupMemo" placeholder="使い方・補足など" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Noto Serif JP',serif;font-size:12px;padding:10px;resize:vertical;min-height:55px;outline:none;margin-bottom:4px;"></textarea>
+    <textarea id="popupMemo" placeholder="使い方・補足など" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Noto Serif JP',serif;font-size:12px;padding:10px;resize:vertical;min-height:clamp(120px, 30vh, 360px);white-space:pre-wrap;outline:none;margin-bottom:4px;"></textarea>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closePastePopup()">キャンセル</button>
@@ -885,7 +885,7 @@ function render() {
         <div class="slots-row">
           ${d.cards.map(n => slotHTML(n)).join('')}
         </div>
-        ${d.memo ? `<div style="font-size:10px;color:var(--text-dim);margin-top:6px;">${escHtml(d.memo)}</div>` : ''}
+        ${d.memo ? `<div style="font-size:10px;color:var(--text-dim);margin-top:6px;opacity:0.8;">✎ メモあり（タップで表示）</div>` : ''}
       </div>`;
   }).join('');
 
