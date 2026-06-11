@@ -26,7 +26,7 @@
     font-family: 'Noto Serif JP', serif;
     background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(126,184,201,0.06) 0%, transparent 60%);
     display:flex; justify-content:center;
-    min-height:100dvh;
+    min-height:100vh; min-height:100dvh;
     touch-action: manipulation;
   }
   .app{ width:100%; max-width:430px; padding:10px 12px 18px; display:flex; flex-direction:column; gap:10px; }
@@ -60,7 +60,7 @@
   .uslot .portrait{ aspect-ratio:166/257; display:flex; align-items:center; justify-content:center; background:var(--surface2); overflow:hidden; position:relative; }
   .uslot .portrait img{ width:100%; height:100%; object-fit:cover; pointer-events:none; }
   .uslot .ph{ font-size:10px; color:var(--text-dim); font-weight:600; padding:0 2px; text-align:center; word-break:break-all; }
-  .uslot .uhp{ font-size:12px; text-align:center; color:var(--accent2); padding:2px 0 3px; }
+  .uslot .uhp{ font-family:'Helvetica Neue',Arial,system-ui,sans-serif; font-size:13px; text-align:center; color:var(--accent2); padding:2px 0 3px; }
   .uslot .uhp .mod{ font-size:8px; color:var(--text-dim); }
   .uslot .badges{ position:absolute; top:3px; right:3px; display:flex; flex-direction:column; gap:2px; z-index:3; }
   .badge{ font-size:8px; padding:1px 4px; border-radius:4px; background:rgba(0,0,0,.55); border:1px solid var(--border); }
@@ -84,10 +84,10 @@
   }
   .calc-line{ font-size:11px; color:var(--text-dim); line-height:1.8; }
   .calc-line b{ color:var(--text); font-weight:600; }
-  .calc-line .dmg-in{ font-size:16px; color:var(--text); }
+  .calc-line .dmg-in{ font-family:'Helvetica Neue',Arial,system-ui,sans-serif; font-size:16px; color:var(--text); }
   .gain-box{ text-align:right; }
   .gain-label{ font-size:9px; letter-spacing:.3em; color:var(--text-dim); }
-  .gain-num{ font-family:'Cormorant Garamond',serif; font-size:44px; line-height:1; color:var(--accent2); text-shadow:0 0 16px rgba(201,168,126,.3); }
+  .gain-num{ font-family:'Helvetica Neue',Arial,system-ui,sans-serif; font-weight:600; font-size:38px; line-height:1; color:var(--accent2); text-shadow:0 0 16px rgba(201,168,126,.3); }
   .gain-num.zero{ color:var(--text-dim); text-shadow:none; }
 
   /* ── 状態ボタン ── */
@@ -105,7 +105,7 @@
   .numpad{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .key{
     background:var(--surface2); border:1px solid var(--border); border-radius:10px;
-    color:var(--text); font-family:'Cormorant Garamond',serif; font-size:24px; padding:12px 0; cursor:pointer;
+    color:var(--text); font-family:'Helvetica Neue',Arial,system-ui,sans-serif; font-size:22px; padding:12px 0; cursor:pointer;
   }
   .key:active{ background:var(--border); }
   .key.fn{ font-family:'Noto Serif JP',serif; font-size:12px; letter-spacing:.15em; color:var(--accent); }
@@ -116,7 +116,7 @@
   .modal-bg{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:flex-end; justify-content:center; z-index:50; }
   .modal-bg.open{ display:flex; }
   .modal{
-    width:100%; max-width:430px; max-height:78dvh; overflow-y:auto;
+    width:100%; max-width:430px; max-height:78vh; max-height:78dvh; overflow-y:auto;
     background:var(--surface); border:1px solid var(--border); border-radius:16px 16px 0 0; padding:16px 16px 26px;
   }
   .modal h2{ font-size:13px; letter-spacing:.2em; color:var(--accent); margin-bottom:12px; font-weight:400; }
@@ -126,11 +126,13 @@
     color:var(--text); font-family:inherit; font-size:14px; padding:10px 12px; margin-bottom:10px;
   }
   .clist{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .fgroup{ margin-bottom:14px; }
+  .flabel{ font-size:10px; letter-spacing:.35em; color:var(--text-dim); margin-bottom:6px; }
   .citem{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface2); cursor:pointer; text-align:center; }
   .citem .portrait{ aspect-ratio:166/257; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .citem img{ width:100%; height:100%; object-fit:cover; }
   .citem .ph{ font-size:9px; color:var(--text-dim); padding:0 2px; word-break:break-all; }
-  .citem .hp{ font-size:10px; color:var(--accent2); padding:2px 0 3px; }
+  .citem .hp{ font-family:'Helvetica Neue',Arial,system-ui,sans-serif; font-size:11px; color:var(--accent2); padding:2px 0 3px; }
   .dlist{ display:flex; flex-direction:column; gap:8px; }
   .ditem{ border:1px solid var(--border); border-radius:10px; padding:10px; background:var(--surface2); cursor:pointer; }
   .ditem .dl{ font-size:12px; margin-bottom:6px; color:var(--text); }
@@ -196,7 +198,7 @@
     <button class="close" data-close="pickerBg">✕</button>
     <h2 id="pickerTitle">キャラ選択</h2>
     <input class="search" id="pickerSearch" type="text" placeholder="キャラ名で検索...">
-    <div class="clist" id="pickerList"></div>
+    <div id="pickerList"></div>
   </div>
 </div>
 
@@ -240,7 +242,15 @@ const HP_MAP = {
   'カレン':84,'パンディア':83,'オルラ':81,'シレスト':81,'ラモンナ':79,
   'トゥルー':77,'ソレール':77,'ハムリン':73
 };
-const ALL_UNITS = Object.keys(HP_MAP);
+// 属性(同属性は同一編成に1体まで。ゲーム内の選択画面と同じ並び順)
+const FACTIONS = [
+  ['守護', ['オジール','アルバ','リリー','アグリッパ','アイギス','ファイント','サンガー','ワンダ','ウインクル','エリカ']],
+  ['闘争', ['ロータン','「24」','ライカー','ハムリン','ヘロット','血ノ鎖・ヘロット','サルバドル','カエクス','ゴリアテ','ダフォダイル']],
+  ['知恵', ['ラモンナ','環行・ラモンナ','ナウティラ','パンディア','ファロス','ミリアム','マーフィー','ティンクト','カーシア']],
+  ['凶星', ['ニムフィーア','ユウハシュ','ソレール','オレッタ','トゥルー','リッツ','ジェンキン']],
+  ['医療', ['ドール','カレン','レーア','タイス','沙耶','シレスト','オルラ']],
+];
+const FACTION_OF = {}; FACTIONS.forEach(([f,list])=>list.forEach(n=>FACTION_OF[n]=f));
 const unitImg = n => IMAGE_BASE + 'units/' + n + '.png';
 
 // ═══ 状態 ═══
@@ -429,12 +439,24 @@ function openPicker(side,pos){
   document.getElementById('pickerBg').classList.add('open');
 }
 function renderPicker(q){
-  document.getElementById('pickerList').innerHTML =
-    ALL_UNITS.filter(n=>!q||n.includes(q)).map(n=>`
+  // 編集中の枠以外で使用中の属性は選択肢から除外(同属性は1編成1体まで)
+  const used = new Set();
+  if(pickerTarget){
+    S[pickerTarget.side].forEach((u,i)=>{
+      if(i!==pickerTarget.pos && u.name && FACTION_OF[u.name]) used.add(FACTION_OF[u.name]);
+    });
+  }
+  const html = FACTIONS.map(([f,list])=>{
+    if(used.has(f)) return '';
+    const items = list.filter(n=>!q||n.includes(q));
+    if(!items.length) return '';
+    return `<div class="fgroup"><div class="flabel">${f}</div><div class="clist">${items.map(n=>`
       <div class="citem" data-n="${n}">
         <div class="portrait"><img src="${unitImg(n)}" alt="${n}" onerror="this.outerHTML='<span class=&quot;ph&quot;>'+this.alt+'</span>'"></div>
         <div class="hp">${HP_MAP[n]}</div>
-      </div>`).join('') || '<div class="empty-note">該当なし</div>';
+      </div>`).join('')}</div></div>`;
+  }).join('');
+  document.getElementById('pickerList').innerHTML = html || '<div class="empty-note">該当なし(同属性のユニットが既に編成にいる可能性があります)</div>';
 }
 document.getElementById('pickerSearch').addEventListener('input',e=>renderPicker(e.target.value.trim()));
 document.getElementById('pickerList').addEventListener('click',e=>{
@@ -454,7 +476,7 @@ document.getElementById('loadDeckBtn').onclick=()=>{
     ? withData.map(s=>`
       <div class="ditem" data-i="${s.i}">
         <div class="dl">${String(s.i+1).padStart(2,'0')}　${escHtml(s.label||'(無題)')}</div>
-        <div class="dunits">${s.data.units.slice(0,4).map(n=>`
+        <div class="dunits">${s.data.units.slice(1,5).map(n=>`
           <div class="du"><img src="${unitImg(n)}" alt="${escHtml(n)}" onerror="this.outerHTML=this.alt.charAt(0)"></div>`).join('')}
         </div>
       </div>`).join('')
@@ -466,9 +488,10 @@ document.getElementById('loadDeckBtn').onclick=()=>{
 document.getElementById('deckList').addEventListener('click',e=>{
   const it=e.target.closest('.ditem'); if(!it) return;
   let slots=[]; try{ slots=JSON.parse(localStorage.getItem(DECKS_KEY))||[]; }catch{}
-  const units=(slots[+it.dataset.i]?.data?.units||[]).slice(0,4);
-  S.ally = [0,1,2,3].map(p=> units[p]&&HP_MAP[units[p]]!==undefined
-    ? { name:units[p], hpMod:0, soft:false, hard:false, voided:false } : emptyUnit());
+  // アーカイブは先頭がキーオーダーなので1つ飛ばして4体。表示の並びが盤面と逆順なので反転して位置に割当
+  const units=(slots[+it.dataset.i]?.data?.units||[]).slice(1,5);
+  S.ally = [0,1,2,3].map(p=>{ const n=units[3-p]; return n&&HP_MAP[n]!==undefined
+    ? { name:n, hpMod:0, soft:false, hard:false, voided:false } : emptyUnit(); });
   S.side='ally'; S.sel={side:'ally',pos:0};
   document.getElementById('deckBg').classList.remove('open');
   saveState(); renderBoard(); renderStates(); renderCalc();
