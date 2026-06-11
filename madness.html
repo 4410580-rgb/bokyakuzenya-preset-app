@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>忘却前夜 — 狂気計算ボード</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=Noto+Serif+JP:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0a0f;
+    --surface:  #12121a;
+    --surface2: #1a1a26;
+    --border:   #2a2a3f;
+    --accent:   #7eb8c9;
+    --accent2:  #c9a87e;
+    --text:     #d4d4e0;
+    --text-dim: #7a7a9a;
+    --danger:   #c97e7e;
+    --glow:     rgba(126,184,201,0.15);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body{ height:100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif JP', serif;
+    background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(126,184,201,0.06) 0%, transparent 60%);
+    display:flex; justify-content:center;
+    min-height:100dvh;
+    touch-action: manipulation;
+  }
+  .app{ width:100%; max-width:430px; padding:10px 12px 18px; display:flex; flex-direction:column; gap:10px; }
+
+  /* ── ヘッダー ── */
+  header{ display:flex; align-items:center; justify-content:space-between; }
+  .logo{ font-family:'Cormorant Garamond',serif; font-size:18px; letter-spacing:.08em; color:var(--accent); }
+  .logo small{ font-family:'Noto Serif JP',serif; color:var(--text-dim); font-size:10px; letter-spacing:.2em; display:block; }
+  .hbtns{ display:flex; gap:8px; }
+  .hbtn{
+    background:var(--surface2); border:1px solid var(--border); color:var(--text);
+    font-family:inherit; font-size:11px; padding:7px 12px; border-radius:8px; cursor:pointer; letter-spacing:.08em;
+    white-space:nowrap; min-width:72px;
+  }
+  .hbtn:active{ background:var(--border); }
+
+  /* ── 盤面 ── */
+  .side-banner{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:11px; letter-spacing:.25em; color:var(--text-dim);
+  }
+  .side-banner .side-name{ color:var(--accent); font-size:13px; letter-spacing:.3em; }
+  .side-banner .side-name.enemy{ color:var(--danger); }
+  .board{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .uslot{
+    position:relative; border:1px solid var(--border); border-radius:10px; overflow:hidden;
+    background:var(--surface); display:flex; flex-direction:column; cursor:pointer;
+  }
+  .uslot.selected{ border-color:var(--accent); box-shadow:0 0 12px var(--glow); }
+  .uslot .pos{ position:absolute; top:3px; left:5px; font-size:9px; color:var(--text-dim); z-index:3; }
+  .uslot .portrait{ aspect-ratio:166/257; display:flex; align-items:center; justify-content:center; background:var(--surface2); overflow:hidden; position:relative; }
+  .uslot .portrait img{ width:100%; height:100%; object-fit:cover; pointer-events:none; }
+  .uslot .ph{ font-size:10px; color:var(--text-dim); font-weight:600; padding:0 2px; text-align:center; word-break:break-all; }
+  .uslot .uhp{ font-size:12px; text-align:center; color:var(--accent2); padding:2px 0 3px; }
+  .uslot .uhp .mod{ font-size:8px; color:var(--text-dim); }
+  .uslot .badges{ position:absolute; top:3px; right:3px; display:flex; flex-direction:column; gap:2px; z-index:3; }
+  .badge{ font-size:8px; padding:1px 4px; border-radius:4px; background:rgba(0,0,0,.55); border:1px solid var(--border); }
+  .badge.b-void{ color:#b9a3e3; border-color:#5b4a85; }
+  .badge.b-soft{ color:var(--danger); border-color:#7a4a55; }
+  .badge.b-hard{ color:var(--accent); border-color:#3f6a78; }
+  .uslot.empty .portrait{ background:transparent; }
+  .uslot.empty .ph{ font-size:18px; }
+  .hp-flash{
+    position:absolute; left:0; right:0; text-align:center; font-size:13px; font-weight:600;
+    color:var(--accent2); z-index:4; pointer-events:none; opacity:0; transition:opacity .15s;
+  }
+  .hp-flash.top{ top:14%; } .hp-flash.bot{ bottom:22%; }
+  .hp-flash.show{ opacity:1; }
+
+  /* ── 結果 ── */
+  .result{
+    background:linear-gradient(180deg, var(--surface) 0%, #0d0d14 100%);
+    border:1px solid var(--border); border-radius:12px;
+    padding:10px 14px; display:flex; align-items:center; justify-content:space-between; min-height:74px;
+  }
+  .calc-line{ font-size:11px; color:var(--text-dim); line-height:1.8; }
+  .calc-line b{ color:var(--text); font-weight:600; }
+  .calc-line .dmg-in{ font-size:16px; color:var(--text); }
+  .gain-box{ text-align:right; }
+  .gain-label{ font-size:9px; letter-spacing:.3em; color:var(--text-dim); }
+  .gain-num{ font-family:'Cormorant Garamond',serif; font-size:44px; line-height:1; color:var(--accent2); text-shadow:0 0 16px rgba(201,168,126,.3); }
+  .gain-num.zero{ color:var(--text-dim); text-shadow:none; }
+
+  /* ── 状態ボタン ── */
+  .staterow{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .sbtn{
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    color:var(--text-dim); font-family:inherit; font-size:13px; padding:11px 0; cursor:pointer; letter-spacing:.2em;
+  }
+  .sbtn:disabled{ opacity:.35; }
+  .sbtn.on-soft{ color:var(--danger); border-color:var(--danger); background:rgba(201,126,126,.08); }
+  .sbtn.on-hard{ color:var(--accent); border-color:var(--accent); background:rgba(126,184,201,.08); }
+  .sbtn.on-void{ color:#b9a3e3; border-color:#8a6fc4; background:rgba(155,109,240,.08); }
+
+  /* ── テンキー ── */
+  .numpad{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .key{
+    background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    color:var(--text); font-family:'Cormorant Garamond',serif; font-size:24px; padding:12px 0; cursor:pointer;
+  }
+  .key:active{ background:var(--border); }
+  .key.fn{ font-family:'Noto Serif JP',serif; font-size:12px; letter-spacing:.15em; color:var(--accent); }
+  .key.fn.enemy-mode{ color:var(--danger); }
+  .key.gear{ font-family:'Noto Serif JP',serif; font-size:14px; color:var(--text-dim); }
+
+  /* ── モーダル ── */
+  .modal-bg{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal-bg.open{ display:flex; }
+  .modal{
+    width:100%; max-width:430px; max-height:78dvh; overflow-y:auto;
+    background:var(--surface); border:1px solid var(--border); border-radius:16px 16px 0 0; padding:16px 16px 26px;
+  }
+  .modal h2{ font-size:13px; letter-spacing:.2em; color:var(--accent); margin-bottom:12px; font-weight:400; }
+  .modal .close{ float:right; background:none; border:none; color:var(--text-dim); font-size:16px; cursor:pointer; }
+  .search{
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:inherit; font-size:14px; padding:10px 12px; margin-bottom:10px;
+  }
+  .clist{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .citem{ border:1px solid var(--border); border-radius:8px; overflow:hidden; background:var(--surface2); cursor:pointer; text-align:center; }
+  .citem .portrait{ aspect-ratio:166/257; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .citem img{ width:100%; height:100%; object-fit:cover; }
+  .citem .ph{ font-size:9px; color:var(--text-dim); padding:0 2px; word-break:break-all; }
+  .citem .hp{ font-size:10px; color:var(--accent2); padding:2px 0 3px; }
+  .dlist{ display:flex; flex-direction:column; gap:8px; }
+  .ditem{ border:1px solid var(--border); border-radius:10px; padding:10px; background:var(--surface2); cursor:pointer; }
+  .ditem .dl{ font-size:12px; margin-bottom:6px; color:var(--text); }
+  .ditem .dunits{ display:flex; gap:6px; }
+  .ditem .dunits .du{ width:44px; height:44px; border-radius:6px; overflow:hidden; background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:10px; color:var(--text-dim); }
+  .ditem .dunits img{ width:100%; height:100%; object-fit:cover; }
+  .empty-note{ font-size:12px; color:var(--text-dim); line-height:1.8; }
+  .radio-row{ display:flex; gap:10px; align-items:flex-start; font-size:12px; line-height:1.6; margin-bottom:10px; cursor:pointer; }
+  .radio-row input{ accent-color:var(--accent); margin-top:3px; }
+  .radio-row small{ display:block; color:var(--text-dim); font-size:10px; }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--surface2); border:1px solid var(--accent); color:var(--text);
+    padding:8px 18px; border-radius:8px; font-size:12px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:99;
+  }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">MADNESS<small>狂気計算ボード</small></div>
+    <div class="hbtns">
+      <button class="hbtn" id="loadDeckBtn">編成読込</button>
+      <button class="hbtn" id="newBattleBtn">新規対戦</button>
+    </div>
+  </header>
+
+  <div class="side-banner">
+    <span class="side-name" id="sideName">味方</span>
+    <span id="sideHint">後列 ←</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <div class="result">
+    <div class="calc-line" id="calcLine">ユニットを選んでダメージを入力</div>
+    <div class="gain-box">
+      <div class="gain-label">狂気増加</div>
+      <div class="gain-num zero" id="gainNum">—</div>
+    </div>
+  </div>
+
+  <div class="staterow">
+    <button class="sbtn" id="btnSoft">軟化</button>
+    <button class="sbtn" id="btnHard">堅固</button>
+    <button class="sbtn" id="btnVoid">虚無</button>
+  </div>
+
+  <div class="numpad" id="numpad">
+    <button class="key" data-d="1">1</button><button class="key" data-d="2">2</button><button class="key" data-d="3">3</button>
+    <button class="key" data-d="4">4</button><button class="key" data-d="5">5</button><button class="key" data-d="6">6</button>
+    <button class="key" data-d="7">7</button><button class="key" data-d="8">8</button><button class="key" data-d="9">9</button>
+    <button class="key gear" id="settingsBtn">設定</button><button class="key" data-d="0">0</button><button class="key fn" id="sideToggle">味方／敵</button>
+  </div>
+
+</div>
+
+<!-- キャラ選択モーダル -->
+<div class="modal-bg" id="pickerBg">
+  <div class="modal">
+    <button class="close" data-close="pickerBg">✕</button>
+    <h2 id="pickerTitle">キャラ選択</h2>
+    <input class="search" id="pickerSearch" type="text" placeholder="キャラ名で検索...">
+    <div class="clist" id="pickerList"></div>
+  </div>
+</div>
+
+<!-- 編成読込モーダル -->
+<div class="modal-bg" id="deckBg">
+  <div class="modal">
+    <button class="close" data-close="deckBg">✕</button>
+    <h2>味方編成を読み込む（編成アーカイブ）</h2>
+    <div class="dlist" id="deckList"></div>
+  </div>
+</div>
+
+<!-- 設定モーダル -->
+<div class="modal-bg" id="settingsBg">
+  <div class="modal">
+    <button class="close" data-close="settingsBg">✕</button>
+    <h2>計算式</h2>
+    <div class="empty-note">
+      最終ダメージ = ceil(入力値 × 軟化1.25 / 堅固0.5)<br>
+      狂気増加量 = ceil(最終ダメージ ÷ 最大HP ÷ 2 × 100)<br>
+      虚無 = 狂気獲得50%減(×0.5してからceil)<br>
+      上限100。バリア・シールドで受けても同量蓄積。<br><br>
+      操作：枠の上1/3タップでHP+5、下1/3で−5、中央で選択、長押しでキャラ変更。テンキーは3桁目の入力でリセット。
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══ データ(仕様書 §3 / アーカイブサイトと同一の画像規約) ═══
+const IMAGE_BASE = './images/';
+const HP_MAP = {
+  'エリカ':129,'リリー':127,'ワンダ':125,'アグリッパ':123,'オジール':123,
+  'サルバドル':121,'カエクス':120,'サンガー':119,'ドール':118,'ゴリアテ':118,
+  'アルバ':117,'ライカー':115,'ダフォダイル':114,'ファイント':113,'アイギス':111,
+  'ロータン':111,'ナウティラ':108,'ヘロット':108,'血ノ鎖・ヘロット':106,'「24」':106,
+  'タイス':102,'マーフィー':100,'ユウハシュ':99,'カーシア':98,'ティンクト':96,
+  '環行・ラモンナ':96,'沙耶':95,'ファロス':94,'ミリアム':93,'リッツ':91,
+  'レーア':90,'ジェンキン':90,'ウインクル':87,'オレッタ':86,'ニムフィーア':85,
+  'カレン':84,'パンディア':83,'オルラ':81,'シレスト':81,'ラモンナ':79,
+  'トゥルー':77,'ソレール':77,'ハムリン':73
+};
+const ALL_UNITS = Object.keys(HP_MAP);
+const unitImg = n => IMAGE_BASE + 'units/' + n + '.png';
+
+// ═══ 状態 ═══
+const BOARD_KEY  = 'amnesia_madness_board_v1';
+const DECKS_KEY  = 'amnesia_decks_v2'; // 編成アーカイブと共有
+const emptyUnit  = () => ({ name:null, hpMod:0, soft:false, hard:false, voided:false });
+let S = {
+  side:'ally',                 // 表示中: 'ally' | 'enemy'
+  ally:  [emptyUnit(),emptyUnit(),emptyUnit(),emptyUnit()],  // index = 位置1〜4
+  enemy: [emptyUnit(),emptyUnit(),emptyUnit(),emptyUnit()],
+  sel: { side:'ally', pos:0 }, // 選択中ユニット
+  formula:'literal',
+};
+let buffer = '';   // テンキー入力(最大2桁、3桁目でリセット)
+let pickerTarget = null;
+
+function saveState(){ try{ localStorage.setItem(BOARD_KEY, JSON.stringify({ally:S.ally, enemy:S.enemy, formula:S.formula})); }catch{} }
+function loadState(){
+  try{
+    const d = JSON.parse(localStorage.getItem(BOARD_KEY));
+    if(d){ if(d.ally) S.ally=d.ally; if(d.enemy) S.enemy=d.enemy; if(d.formula) S.formula=d.formula; }
+  }catch{}
+}
+
+// ═══ 計算 ═══
+// 最終ダメージ = ceil(基礎 × 軟化1.25/堅固0.5)  …仕様書 §5(乗算後にceil)
+// 狂気増加量   = ceil(最終ダメージ ÷ 最大HP ÷ 2 × 100)
+// 虚無         = 獲得50%減(×0.5してからceil)
+function calc(unit, base){
+  const maxHP = (HP_MAP[unit.name]||0) + unit.hpMod;
+  if(base<=0 || maxHP<=0) return null;
+  const mult = unit.soft ? 1.25 : unit.hard ? 0.5 : 1;
+  const finalDmg = Math.ceil(base * mult);
+  let raw = finalDmg / maxHP / 2 * 100;
+  if(unit.voided) raw *= 0.5;
+  return { finalDmg, maxHP, gain: Math.min(100, Math.ceil(raw)) };
+}
+
+// ═══ 描画 ═══
+const board=document.getElementById('board'), gainNum=document.getElementById('gainNum'),
+      calcLine=document.getElementById('calcLine');
+
+function curUnits(){ return S.side==='ally' ? S.ally : S.enemy; }
+function selUnit(){ return S[S.sel.side][S.sel.pos]; }
+
+// 並び: 味方 = 後列←[4][3][2][1]→前列 / 敵 = 前列←[1][2][3][4]→後列 (仕様書 §2)
+function displayOrder(){ return S.side==='ally' ? [3,2,1,0] : [0,1,2,3]; }
+
+function renderBoard(){
+  const units = curUnits();
+  document.getElementById('sideName').textContent = S.side==='ally' ? '味方' : '敵';
+  document.getElementById('sideName').className = 'side-name' + (S.side==='enemy' ? ' enemy' : '');
+  document.getElementById('sideHint').textContent = S.side==='ally' ? '← 後列 ｜ 前列 →' : '← 前列 ｜ 後列 →';
+  document.getElementById('sideToggle').classList.toggle('enemy-mode', S.side==='enemy');
+
+  board.innerHTML = displayOrder().map(pos=>{
+    const u = units[pos];
+    const isSel = S.sel.side===S.side && S.sel.pos===pos;
+    if(!u.name){
+      return `<div class="uslot empty${isSel?' selected':''}" data-pos="${pos}">
+        <span class="pos">${pos+1}</span>
+        <div class="portrait"><span class="ph" style="font-size:18px">＋</span></div>
+        <div class="uhp" style="color:var(--text-dim);font-size:9px">未設定</div>
+      </div>`;
+    }
+    const hp = (HP_MAP[u.name]||0)+u.hpMod;
+    return `<div class="uslot${isSel?' selected':''}" data-pos="${pos}">
+      <span class="pos">${pos+1}</span>
+      <div class="badges">
+        ${u.voided?'<span class="badge b-void">虚無</span>':''}
+        ${u.soft?'<span class="badge b-soft">軟化</span>':''}
+        ${u.hard?'<span class="badge b-hard">堅固</span>':''}
+      </div>
+      <div class="portrait">
+        <img src="${unitImg(u.name)}" alt="${u.name}" onerror="this.outerHTML='<span class=&quot;ph&quot;>'+this.alt+'</span>'">
+      </div>
+      <div class="hp-flash top" data-f="up">+5</div><div class="hp-flash bot" data-f="dn">−5</div>
+      <div class="uhp">${hp}${u.hpMod?`<span class="mod">(${u.hpMod>0?'+':''}${u.hpMod})</span>`:''}</div>
+    </div>`;
+  }).join('');
+
+  // タップ: 上1/3=HP+5 / 下1/3=HP−5 / 中央=選択。長押し=キャラ変更
+  board.querySelectorAll('.uslot').forEach(el=>{
+    const pos = +el.dataset.pos;
+    let lpTimer=null, longPressed=false;
+    const start = ()=>{ longPressed=false; lpTimer=setTimeout(()=>{ longPressed=true; openPicker(S.side,pos); },550); };
+    const cancel = ()=>clearTimeout(lpTimer);
+    el.addEventListener('touchstart',start,{passive:true});
+    el.addEventListener('touchmove',cancel,{passive:true});
+    el.addEventListener('touchend',cancel);
+    el.addEventListener('mousedown',start);
+    el.addEventListener('mouseup',cancel);
+    el.addEventListener('mouseleave',cancel);
+    el.addEventListener('click',e=>{
+      if(longPressed) return;
+      const u = curUnits()[pos];
+      if(!u.name){ openPicker(S.side,pos); return; }
+      const r = el.getBoundingClientRect();
+      const y = (e.clientY - r.top) / r.height;
+      if(y < 0.33){ u.hpMod += 5; flash(el,'up'); }
+      else if(y > 0.67){ u.hpMod -= 5; flash(el,'dn'); }
+      S.sel = { side:S.side, pos };
+      saveState(); renderBoard(); renderCalc(); renderStates();
+    });
+  });
+}
+
+function flash(el,dir){
+  // 再描画前に一瞬表示するため、描画後の同位置スロットに付け直す
+  requestAnimationFrame(()=>{
+    const pos = el.dataset.pos;
+    const nel = board.querySelector(`.uslot[data-pos="${pos}"] .hp-flash[data-f="${dir}"]`);
+    if(nel){ nel.classList.add('show'); setTimeout(()=>nel.classList.remove('show'),450); }
+  });
+}
+
+function renderStates(){
+  const u = selUnit();
+  const has = !!u.name;
+  for(const [id,cls,key] of [['btnSoft','on-soft','soft'],['btnHard','on-hard','hard'],['btnVoid','on-void','voided']]){
+    const b=document.getElementById(id);
+    b.disabled = !has;
+    b.classList.toggle(cls, has && u[key]);
+  }
+}
+
+function renderCalc(){
+  const u = selUnit();
+  const base = parseInt(buffer,10)||0;
+  if(!u.name || !buffer){
+    gainNum.textContent='—'; gainNum.classList.add('zero');
+    calcLine.innerHTML = !u.name
+      ? 'ユニットを選んでダメージを入力'
+      : `<b>${u.name}</b>（HP ${(HP_MAP[u.name]||0)+u.hpMod}）<br>基礎ダメージを入力 <span class="dmg-in">${buffer||''}_</span>`;
+    return;
+  }
+  const r = calc(u, base);
+  gainNum.textContent = '+'+r.gain; gainNum.classList.remove('zero');
+  const mult = u.soft?'×1.25':u.hard?'×0.5':'';
+  calcLine.innerHTML =
+    `<b>${u.name}</b>（HP ${r.maxHP}）<br>`+
+    `入力 <span class="dmg-in">${base}</span>${mult?` ${mult} → 最終 <b>${r.finalDmg}</b>`:''}`+
+    `${u.voided?'<br>虚無：獲得50%減':''}`;
+}
+
+// ═══ テンキー ═══
+document.getElementById('numpad').addEventListener('click',e=>{
+  const k = e.target.closest('[data-d]');
+  if(!k) return;
+  if(buffer.length>=2){ buffer=''; }     // 3桁目=クリア(3桁ダメージは存在しない)
+  else buffer += k.dataset.d;
+  if(buffer==='0') buffer='';            // 先頭0は無視
+  renderCalc();
+});
+
+// ═══ 状態ボタン(選択ユニットに保存・軟化/堅固は排他) ═══
+document.getElementById('btnSoft').onclick=()=>{ const u=selUnit(); if(!u.name)return; u.soft=!u.soft; if(u.soft)u.hard=false; saveState(); renderStates(); renderBoard(); renderCalc(); };
+document.getElementById('btnHard').onclick=()=>{ const u=selUnit(); if(!u.name)return; u.hard=!u.hard; if(u.hard)u.soft=false; saveState(); renderStates(); renderBoard(); renderCalc(); };
+document.getElementById('btnVoid').onclick=()=>{ const u=selUnit(); if(!u.name)return; u.voided=!u.voided; saveState(); renderStates(); renderBoard(); renderCalc(); };
+
+// ═══ 味方/敵 切替 ═══
+document.getElementById('sideToggle').onclick=()=>{
+  S.side = S.side==='ally' ? 'enemy' : 'ally';
+  S.sel = { side:S.side, pos:S.side==='ally'?0:0 };
+  buffer='';
+  renderBoard(); renderStates(); renderCalc();
+};
+
+// ═══ 新規対戦(敵クリア・全状態/HP補正リセット、味方の編成は維持) ═══
+document.getElementById('newBattleBtn').onclick=()=>{
+  if(!confirm('新規対戦を開始しますか？\n(敵編成・虚無/軟化/堅固・HP補正をリセット)')) return;
+  S.ally = S.ally.map(u=>({ name:u.name, hpMod:0, soft:false, hard:false, voided:false }));
+  S.enemy = [emptyUnit(),emptyUnit(),emptyUnit(),emptyUnit()];
+  S.side='enemy'; S.sel={side:'enemy',pos:0}; buffer='';
+  saveState(); renderBoard(); renderStates(); renderCalc();
+  toast('敵編成を入力してください');
+};
+
+// ═══ キャラ選択モーダル ═══
+function openPicker(side,pos){
+  pickerTarget={side,pos};
+  document.getElementById('pickerTitle').textContent =
+    `${side==='ally'?'味方':'敵'} 位置${pos+1} のキャラ選択`;
+  document.getElementById('pickerSearch').value='';
+  renderPicker('');
+  document.getElementById('pickerBg').classList.add('open');
+}
+function renderPicker(q){
+  document.getElementById('pickerList').innerHTML =
+    ALL_UNITS.filter(n=>!q||n.includes(q)).map(n=>`
+      <div class="citem" data-n="${n}">
+        <div class="portrait"><img src="${unitImg(n)}" alt="${n}" onerror="this.outerHTML='<span class=&quot;ph&quot;>'+this.alt+'</span>'"></div>
+        <div class="hp">${HP_MAP[n]}</div>
+      </div>`).join('') || '<div class="empty-note">該当なし</div>';
+}
+document.getElementById('pickerSearch').addEventListener('input',e=>renderPicker(e.target.value.trim()));
+document.getElementById('pickerList').addEventListener('click',e=>{
+  const it=e.target.closest('.citem'); if(!it||!pickerTarget) return;
+  S[pickerTarget.side][pickerTarget.pos] = { name:it.dataset.n, hpMod:0, soft:false, hard:false, voided:false };
+  S.sel = {...pickerTarget};
+  document.getElementById('pickerBg').classList.remove('open');
+  saveState(); renderBoard(); renderStates(); renderCalc();
+});
+
+// ═══ 編成読込(アーカイブの localStorage を共有) ═══
+document.getElementById('loadDeckBtn').onclick=()=>{
+  let slots=[];
+  try{ slots = JSON.parse(localStorage.getItem(DECKS_KEY))||[]; }catch{}
+  const withData = slots.map((s,i)=>({...s,i})).filter(s=>s.data&&s.data.units&&s.data.units.length);
+  document.getElementById('deckList').innerHTML = withData.length
+    ? withData.map(s=>`
+      <div class="ditem" data-i="${s.i}">
+        <div class="dl">${String(s.i+1).padStart(2,'0')}　${escHtml(s.label||'(無題)')}</div>
+        <div class="dunits">${s.data.units.slice(0,4).map(n=>`
+          <div class="du"><img src="${unitImg(n)}" alt="${escHtml(n)}" onerror="this.outerHTML=this.alt.charAt(0)"></div>`).join('')}
+        </div>
+      </div>`).join('')
+    : `<div class="empty-note">保存された編成が見つかりません。<br>
+       このファイルを編成アーカイブと同じフォルダ(同じサイト)に置くと、アーカイブの編成をここから読み込めます。<br>
+       味方枠を直接タップして手動登録もできます。</div>`;
+  document.getElementById('deckBg').classList.add('open');
+};
+document.getElementById('deckList').addEventListener('click',e=>{
+  const it=e.target.closest('.ditem'); if(!it) return;
+  let slots=[]; try{ slots=JSON.parse(localStorage.getItem(DECKS_KEY))||[]; }catch{}
+  const units=(slots[+it.dataset.i]?.data?.units||[]).slice(0,4);
+  S.ally = [0,1,2,3].map(p=> units[p]&&HP_MAP[units[p]]!==undefined
+    ? { name:units[p], hpMod:0, soft:false, hard:false, voided:false } : emptyUnit());
+  S.side='ally'; S.sel={side:'ally',pos:0};
+  document.getElementById('deckBg').classList.remove('open');
+  saveState(); renderBoard(); renderStates(); renderCalc();
+  toast('味方編成を読み込みました');
+});
+
+// ═══ 設定 ═══
+document.getElementById('settingsBtn').onclick=()=>{
+  document.getElementById('settingsBg').classList.add('open');
+};
+
+// ═══ 共通 ═══
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).classList.remove('open'));
+document.querySelectorAll('.modal-bg').forEach(bg=>bg.addEventListener('click',e=>{ if(e.target===bg) bg.classList.remove('open'); }));
+function escHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+// ═══ 起動 ═══
+loadState();
+renderBoard(); renderStates(); renderCalc();
+</script>
+</body>
+</html>
