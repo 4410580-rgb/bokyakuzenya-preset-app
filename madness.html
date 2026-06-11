@@ -143,6 +143,27 @@
   .radio-row{ display:flex; gap:10px; align-items:flex-start; font-size:12px; line-height:1.6; margin-bottom:10px; cursor:pointer; }
   .radio-row input{ accent-color:var(--accent); margin-top:3px; }
   .radio-row small{ display:block; color:var(--text-dim); font-size:10px; }
+  /* ── 初回ガイド ── */
+  .guide-bg{ position:fixed; inset:0; background:rgba(5,5,10,.92); display:none; align-items:center; justify-content:center; z-index:60; padding:20px; }
+  .guide-bg.open{ display:flex; }
+  .guide{ width:100%; max-width:400px; background:var(--surface); border:1px solid var(--accent); border-radius:16px; padding:26px 22px 20px; text-align:center; }
+  .gpage{ display:none; }
+  .gpage.on{ display:block; }
+  .gstep{ font-size:10px; letter-spacing:.35em; color:var(--text-dim); margin-bottom:10px; }
+  .gtitle{ font-size:20px; font-weight:600; color:var(--accent); line-height:1.6; margin-bottom:14px; }
+  .gtext{ font-size:14px; line-height:2.1; color:var(--text); }
+  .gtext b{ color:var(--accent2); font-weight:600; }
+  .gtext a{ color:var(--accent); word-break:break-all; font-size:12px; }
+  .gsmall{ font-size:11px; color:var(--text-dim); line-height:2; text-align:left; }
+  .gcard{ width:120px; margin:16px auto 6px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .gzone{ padding:15px 0; font-size:16px; font-weight:600; font-family:'Helvetica Neue',Arial,system-ui,sans-serif; }
+  .gzone.up{ background:rgba(126,184,201,.18); color:var(--accent); }
+  .gzone.mid{ background:var(--surface2); color:var(--text-dim); font-size:11px; font-family:'Noto Serif JP',serif; padding:20px 0; }
+  .gzone.dn{ background:rgba(201,126,126,.18); color:var(--danger); }
+  .gdots{ display:flex; gap:8px; justify-content:center; margin:18px 0 14px; }
+  .gdot{ width:8px; height:8px; border-radius:50%; background:var(--border); }
+  .gdot.on{ background:var(--accent); }
+  .gnext{ width:100%; background:var(--accent); color:#0a0a0f; border:none; border-radius:10px; font-family:inherit; font-size:15px; font-weight:600; padding:13px 0; cursor:pointer; letter-spacing:.15em; }
   .toast{
     position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
     background:var(--surface2); border:1px solid var(--accent); color:var(--text);
@@ -211,18 +232,30 @@
   </div>
 </div>
 
-<!-- 設定モーダル -->
-<div class="modal-bg" id="settingsBg">
-  <div class="modal">
-    <button class="close" data-close="settingsBg">✕</button>
-    <h2>計算式</h2>
-    <div class="empty-note">
-      最終ダメージ = ceil(入力値 × 軟化1.25 / 堅固0.5)<br>
-      狂気増加量 = ceil(最終ダメージ ÷ 最大HP ÷ 2 × 100)<br>
-      虚無 = 狂気獲得50%減(×0.5してからceil)<br>
-      上限100。バリア・シールドで受けても同量蓄積。<br><br>
-      操作：枠の上1/3タップでHP+5、下1/3で−5、中央で選択、長押しでキャラ変更。テンキーは3桁目の入力でリセット。
+<!-- ガイド(初回表示・「設定」で見返し可) -->
+<div class="guide-bg" id="guideBg">
+  <div class="guide">
+    <div class="gpage" data-g="0">
+      <div class="gstep">1 / 2</div>
+      <div class="gtitle">編成アーカイブとの連携</div>
+      <div class="gtext">
+        下記サイトで保存した編成データは<br>
+        <b>「編成読込」</b>から直接呼び出せます。<br><br>
+        <a href="https://4410580-rgb.github.io/bokyakuzenya-preset-app/" target="_blank">https://4410580-rgb.github.io/<br>bokyakuzenya-preset-app/</a>
+      </div>
     </div>
+    <div class="gpage" data-g="1">
+      <div class="gstep">2 / 2</div>
+      <div class="gtitle">最大HPの調整</div>
+      <div class="gcard">
+        <div class="gzone up">▲ +5</div>
+        <div class="gzone mid">キャラ画像<br>(中央タップで選択)</div>
+        <div class="gzone dn">▼ −5</div>
+      </div>
+      <div class="gtext">ユニット画像の<b>上部をタップで +5</b><br><b>下部をタップで −5</b> します</div>
+    </div>
+    <div class="gdots" id="gdots"></div>
+    <button class="gnext" id="gnext">次へ</button>
   </div>
 </div>
 
@@ -498,10 +531,21 @@ document.getElementById('deckList').addEventListener('click',e=>{
   toast('味方編成を読み込みました');
 });
 
-// ═══ 設定 ═══
-document.getElementById('settingsBtn').onclick=()=>{
-  document.getElementById('settingsBg').classList.add('open');
-};
+// ═══ ガイド(初回表示・「設定」で見返し可) ═══
+const GUIDE_KEY = 'amnesia_madness_guide_seen';
+let gpage = 0;
+function renderGuide(){
+  document.querySelectorAll('.gpage').forEach(el=>el.classList.toggle('on', +el.dataset.g===gpage));
+  document.getElementById('gdots').innerHTML = [0,1].map(i=>`<span class="gdot${i===gpage?' on':''}"></span>`).join('');
+  document.getElementById('gnext').textContent = gpage<1 ? '次へ' : 'はじめる';
+}
+function openGuide(){ gpage=0; renderGuide(); document.getElementById('guideBg').classList.add('open'); }
+function closeGuide(){
+  document.getElementById('guideBg').classList.remove('open');
+  try{ localStorage.setItem(GUIDE_KEY,'1'); }catch{}
+}
+document.getElementById('gnext').onclick=()=>{ if(gpage<1){ gpage++; renderGuide(); } else closeGuide(); };
+document.getElementById('settingsBtn').onclick=openGuide;
 
 // ═══ 共通 ═══
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.close).classList.remove('open'));
@@ -512,6 +556,7 @@ function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.
 // ═══ 起動 ═══
 loadState();
 renderBoard(); renderStates(); renderCalc();
+try{ if(!localStorage.getItem(GUIDE_KEY)) openGuide(); }catch{}
 </script>
 </body>
 </html>
