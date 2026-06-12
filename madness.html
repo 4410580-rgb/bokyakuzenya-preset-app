@@ -252,7 +252,7 @@
         <div class="gzone mid">キャラ画像<br>(中央タップで選択)</div>
         <div class="gzone dn">▼ −5</div>
       </div>
-      <div class="gtext">ユニット画像の<b>上部をタップで +5</b><br><b>下部をタップで −5</b> します</div>
+      <div class="gtext"><b>選択中の</b>ユニット画像の<br><b>上部をタップで +5</b><br><b>下部をタップで −5</b> します</div>
     </div>
     <div class="gdots" id="gdots"></div>
     <button class="gnext" id="gnext">次へ</button>
@@ -381,10 +381,13 @@ function renderBoard(){
       if(longPressed) return;
       const u = curUnits()[pos];
       if(!u.name){ openPicker(S.side,pos); return; }
-      const r = el.getBoundingClientRect();
-      const y = (e.clientY - r.top) / r.height;
-      if(y < 0.33){ u.hpMod += 5; flash(el,'up'); }
-      else if(y > 0.67){ u.hpMod -= 5; flash(el,'dn'); }
+      // HP増減は「既に選択中のユニット」をタップした場合のみ(判定は上下1/4)
+      if(S.sel.side===S.side && S.sel.pos===pos){
+        const r = el.getBoundingClientRect();
+        const y = (e.clientY - r.top) / r.height;
+        if(y < 0.25){ u.hpMod += 5; flash(el,'up'); }
+        else if(y > 0.75){ u.hpMod -= 5; flash(el,'dn'); }
+      }
       S.sel = { side:S.side, pos };
       saveState(); renderBoard(); renderCalc(); renderStates();
     });
