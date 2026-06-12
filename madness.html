@@ -436,7 +436,7 @@ function renderCalc(){
 document.getElementById('numpad').addEventListener('click',e=>{
   const k = e.target.closest('[data-d]');
   if(!k) return;
-  if(buffer.length>=2){ buffer=''; }     // 3桁目=クリア(3桁ダメージは存在しない)
+  if(buffer.length>=2){ buffer = k.dataset.d; }  // 2桁入力済みの場合はクリアしてその数値を入力
   else buffer += k.dataset.d;
   if(buffer==='0') buffer='';            // 先頭0は無視
   renderCalc();
